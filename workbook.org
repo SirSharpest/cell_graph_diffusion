@@ -1,0 +1,143 @@
+#+BEGIN_SRC ipython :session
+from glob import glob as gb
+import matplotlib.pyplot as plt
+files = gb("/Users/hughesn//PHD/Datasets/Images/Faulkner2013/Normalised/30nov11_Col0_mRFP.lif/*.png")
+
+img_loc = files[0]
+orig = plt.imread(img_loc)
+orig = orig[:,:,:3]
+image = np.copy(orig)
+mask = np.where(image[:, :, 0] > 200)
+edge_map = np.zeros(image.shape)
+edge_map[mask] = [1, 1, 1]
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [273]:
+:END:
+
+
+
+* Mass conversions
+
+#+BEGIN_SRC ipython :session :ipyfile '((:name "graph" :filename "obipy-resources/graph.png" :caption "" :attr_html ":width 450px" :attr_latex ":width 15cm"))
+from image_to_network import make_network as mw
+from glob import glob as gb
+import matplotlib.pyplot as plt
+files = gb("/Users/hughesn//PHD/Datasets/Images/Faulkner2013/Normalised/30nov11_Col0_mRFP.lif/*.png")
+gs = [mw(files[idx], draw=True, save_loc=f"./graphs/{idx}.png") for idx in range(len(files))]
+#+END_SRC
+
+
+#+BEGIN_SRC ipython :session
+gs = [mw(f) for f in files]
+#+END_SRC
+
+* Quantify cells
+
+#+BEGIN_SRC ipython :session
+  from skimage.measure import label, regionprops
+  from image_to_network import get_img_labels_edge_map, read_img_pair
+
+  paired = gb('./Paired/*.png')
+  p = paired[0]
+  inp, mask = read_img_pair(p)
+  orig, image_labels, edge_map = get_img_labels_edge_map(mask)
+  props = regionprops(image_labels)
+  mask2d = np.zeros(image_labels.shape)
+  for p in props:
+      x, y = np.split(p.coords, [-1], axis=1)
+      mask2d[x, y] = 1
+      image_overlayed = np.where(mask2d[..., None], inp, 0)
+
+
+  plt.imshow(mask)
+  plt.grid('off')
+
+#+END_SRC
+
+#+BEGIN_SRC ipython :session
+plt.imshow(plt.imread(paired[2]))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [637]:
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/6138cfefb12563711e377994d5bae0210c8bc300/ba924a9e2fedbc0edd5d0e5d6c25e5093a31e2fa.png]]
+:END:
+
+
+
+#+BEGIN_SRC ipython :session
+  from image_to_network import get_network_from_paired
+  g = get_network_from_paired(paired[1])
+  inp, mask = read_img_pair(paired[1])
+  import networkx as nx
+  fig, ax = plt.subplots(1, figsize=(10,10))
+  pos = {}
+  for idx in list(g.nodes):
+      pos[idx] = (np.array(g.nodes[idx]['centroid'])[::-1])
+  ax.imshow(mask)
+  _ = nx.draw(g, pos, with_labels=False, ax=ax)
+  _ = nx.draw_networkx_labels(g, pos, labels={k: v['intensity'] for k,v in g.nodes(data=True)} ,ax=ax)
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [647]:
+# text/plain
+: <Figure size 720x720 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/6138cfefb12563711e377994d5bae0210c8bc300/0d5d4b8e5fa3fa15ac293f7654e531b39e02643a.png]]
+:END:
+
+
+#+BEGIN_SRC ipython :session
+
+inp, mask = read_img_pair(paired[2])
+g = make_network(mask)
+_, image_labels, edge_map = get_img_labels_edge_map(mask)
+
+def calc_grayvalues(inp, image_labels, g):
+    props = regionprops(image_labels)
+
+    grayvals = {}
+    for (idx, _), p in zip(g.nodes(data=True), props):
+        mask2d = np.zeros(image_labels.shape)
+        x, y = np.split(p.coords, [-1], axis=1)
+        mask2d[x, y] = 1
+        cell = np.where(mask2d, rgb2gray(inp), 0)
+        grayvals[idx] = np.around(np.sum(cell)/p.area, 2)
+    return grayvals
+
+calc_grayvalues(inp, image_labels, g)
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [646]:
+# text/plain
+: {1: 0.82, 2: 0.15}
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/6138cfefb12563711e377994d5bae0210c8bc300/4ee517bea9fe0e4d05bd998dddb8f6d9b52a5ab6.png]]
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/6138cfefb12563711e377994d5bae0210c8bc300/8f49e7b2a880113342e6cc307ddb1b4831fb1eb6.png]]
+:END:

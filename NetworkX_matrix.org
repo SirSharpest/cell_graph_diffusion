@@ -1,0 +1,251 @@
+#+TITLE: Diffusion on a graph
+#+OPTIONS: toc:nil H:4 ^:nil
+#+LaTeX_CLASS: article
+#+LaTeX_CLASS_OPTIONS: [a4paper]
+#+LaTeX_HEADER: \usepackage[margin=0.8in]{geometry}
+#+LaTeX_HEADER: \usepackage{amssymb,amsmath}
+#+LaTeX_HEADER: \usepackage{fancyhdr}
+#+LaTeX_HEADER: \pagestyle{fancy}
+#+LaTeX_HEADER: \usepackage{lastpage}
+#+LaTeX_HEADER: \usepackage{float}
+#+LaTeX_HEADER: \restylefloat{figure}
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \usepackage{tabularx}
+#+LaTeX_HEADER: \hypersetup{urlcolor=blue}
+#+LaTex_HEADER: \usepackage{titlesec}
+#+LaTex_HEADER: \setcounter{secnumdepth}{4}
+#+LaTeX_HEADER: \usepackage{minted}
+#+LaTeX_HEADER: \setminted{frame=single,framesep=10pt}
+#+LaTeX_HEADER: \chead{}
+#+LaTeX_HEADER: \rhead{\today}
+#+LaTeX_HEADER: \cfoot{}
+#+LaTeX_HEADER: \rfoot{\thepage\ of \pageref{LastPage}}
+#+LaTeX_HEADER: \usepackage[parfill]{parskip}
+#+LaTeX_HEADER:\usepackage{subfig}
+#+LaTex_HEADER: \usepackage[sort&compress, numbers]{natbib}
+#+LaTeX_HEADER: \hypersetup{colorlinks=true,linkcolor=black, citecolor=black}
+#+LATEX_HEADER_EXTRA:  \usepackage{framed}
+#+LATEX_HEADER_EXTRA: \usepackage{mathtools, cases}
+#+LATEX: \maketitle
+#+LATEX: \clearpage
+#+LATEX: \tableofcontents
+#+LATEX: \clearpage
+
+* Setup
+
+  #+BEGIN_SRC ipython :session :ipyfile '((:name "network" :filename "obipy-resources/network.png" :caption "" :attr_html ":width 350px" :attr_latex ":width 15cm"))
+  from image_to_network import make_network
+  import numpy as np
+  import networkx as nx
+  import matplotlib.pyplot as plt
+
+  g = make_network("./Testing/test2.png")
+  pos = {}
+  for idx in list(g.nodes):
+      pos[idx] = (np.array(g.nodes[idx]['centroid'])[::-1])
+
+
+  fig, ax = plt.subplots(1)
+  nx.draw(g, pos, ax=ax, with_labels=True)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [154]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+#+attr_html: :width 350px
+#+attr_latex: :width 15cm
+#+caption:
+#+name: network
+[[file:obipy-resources/network.png]]
+:END:
+
+
+#+BEGIN_SRC ipython :session :ipyfile '((:name "diffusion" :filename "obipy-resources/diffusion.png" :caption "" :attr_html ":width 350px" :attr_latex ":width 15cm"))
+
+  import network_diffusion
+  np.random.seed(1994)
+
+  A = nx.to_numpy_matrix(g)
+  A[A > 0] = 1
+  D = np.diag(np.array(A.sum(axis=1)).flatten())
+  C = np.around(np.random.random(A.shape)*100) * D
+  R = 1/10
+  dt = 1
+
+  def plot_network(g, C):
+      fig, ax = plt.subplots(1)
+      _ = nx.draw(g, pos, ax=ax, with_labels=False, node_size=np.diag(C))
+      _ = nx.draw_networkx_labels(g, pos, labels={k: np.around(v) for k, v in zip(list(g.nodes), np.diag(C))} , ax=ax)
+
+  plot_network(g, C)
+  diffuser = network_diffusion.diffuse(A,C,D,R,dt)
+  Cs = [next(diffuser) for i in range(10)]
+  plot_network(g, Cs[0])
+
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [155]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+#+attr_html: :width 350px
+#+attr_latex: :width 15cm
+#+caption:
+#+name: diffusion
+[[file:obipy-resources/diffusion.png]]
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/b29aec2100c8f4dcdaf77ebe1c319d9655647b99/2514f758743d6c9719a0e1e06e5d65abac7d3807.png]]
+:END:
+
+
+
+
+
+
+** Fix stuff
+#+BEGIN_SRC ipython :session
+  nums = iter(np.arange(0, 100))
+  for n in g.nodes():
+      g[n]['name'] = next(nums)
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [116]:
+# output
+---------------------------------------------------------------------------
+TypeError                                 Traceback (most recent call last)
+<ipython-input-116-208ef8227a36> in <module>
+      1 nums = iter(np.arange(0, 100))
+      2 for n in g.nodes:
+----> 3     g[n]['name'] = next(nums)
+
+TypeError: 'AtlasView' object does not support item assignment
+:END:
+
+
+** Test matrix multiplications work out
+#+BEGIN_SRC ipython :session
+A = np.array([[0,1,0], [1,0,1], [0,1,0]])
+C = np.array([[0.5,0,0], [0,1,0], [0,0,0.5]])
+D = np.array([[1,0,0], [0,2,0], [0,0,1]])
+R = 1/10
+O = C*R*D
+I = np.diag(np.sum((A * np.sum(C*R, axis=1)), axis=1) )
+Cn = C - O + I
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [157]:
+:END:
+
+
+#+BEGIN_SRC ipython :session
+A = np.array(nx.to_numpy_matrix(g))
+A[A > 0] = 1
+D = np.diag(np.array(A.sum(axis=1)).flatten())
+C = np.around(np.random.random(A.shape)*100) * D
+R = 1/10
+dt = 1
+O = C*R*D
+I = np.diag(np.sum((A * np.sum(C*R, axis=1)), axis=1))
+Cn = C - O + I
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [529]:
+:END:
+
+
+** Testing diffusion matrices
+#+BEGIN_SRC ipython :session
+  from network_diffusion import diffuse
+
+  A = np.array([[0,1,0], [1,0,1], [0,1,0]])
+  C = np.array([[0.5,0,0], [0,1,0], [0,0,0.5]])
+  D = np.array([[1,0,0], [0,2,0], [0,0,1]])
+  R = 1/10
+  dt = 1
+
+  diffuser = diffuse(A,C,D,R,dt)
+
+  for i in range(5):
+      Cn = next(diffuser)
+      print(Cn)
+
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [156]:
+# output
+[[0.55 0.   0.  ]
+ [0.   0.9  0.  ]
+ [0.   0.   0.55]]
+[[0.585 0.    0.   ]
+ [0.    0.83  0.   ]
+ [0.    0.    0.585]]
+[[0.6095 0.     0.    ]
+ [0.     0.781  0.    ]
+ [0.     0.     0.6095]]
+[[0.62665 0.      0.     ]
+ [0.      0.7467  0.     ]
+ [0.      0.      0.62665]]
+[[0.638655 0.       0.      ]
+ [0.       0.72269  0.      ]
+ [0.       0.       0.638655]]
+
+:END:
+
+
+\clearpage
+* Diffusion
+For network diffusion we use the adjacency matrix $A$ the concentration matrix $C$ and the exchange per connection (i.e. PD rate) $R$ to calculate the incoming and outgoing concentration of some molecule. To calculate the outgoing we use the following:
+
+\begin{equation}
+O_{t+1} = C_tRD
+\end{equation}
+
+Here, we take the concentration matrix, the degree matrix $D$ and exchange per connection to find how much will leave each cell.
+
+
+Next we calculate the incoming of each cell:
+
+
+\begin{equation}
+I_{t+1} = E \times \sum^{n}_{m}(A(\sum^{i}_{j} (C_tR)_j))_m
+\end{equation}
+
+
+We sum over the matrix $CR$ row-by-row, to calculate the expected loss of each cell represented by a $1 \times N$ vector. We can combine this with the adjacency matrix $A$ to give a matrix of $N \times N$ which if summed row-by-row will give another $1 \times N$ vector of incoming concentrations from connected nodes. Multiply this with an $N \times N$ matrix $E$ where $E_{n=m} = 1$ and $0$ elsewhere.
+
+
+Both of these together give a simple solution for concentration exchange, where the concentration matrix at $t+1$ is equal to:
+
+\begin{equation}
+C_{t+1} = C_t - O_{t+1} + I_{t+1}
+\end{equation}
+
+Which we expand into a rules based system easily by allowing for the altercation of $C$ by modifying this to be:
+\begin{equation}
+C_{t+1} = f(C_t) - g(O_{t+1}) + h(I_{t+1})
+\end{equation}
+
+where $f, g, h$ are pure functions, or a series of functions, which would affect concentration change in cells e.g. some production or decay function.
