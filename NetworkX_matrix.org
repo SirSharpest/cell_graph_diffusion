@@ -1,45 +1,14 @@
 #+TITLE: Diffusion on a graph
-#+OPTIONS: toc:nil H:4 ^:nil
-#+LaTeX_CLASS: article
-#+LaTeX_CLASS_OPTIONS: [a4paper]
-#+LaTeX_HEADER: \usepackage[margin=0.8in]{geometry}
-#+LaTeX_HEADER: \usepackage{amssymb,amsmath}
-#+LaTeX_HEADER: \usepackage{fancyhdr}
-#+LaTeX_HEADER: \pagestyle{fancy}
-#+LaTeX_HEADER: \usepackage{lastpage}
-#+LaTeX_HEADER: \usepackage{float}
-#+LaTeX_HEADER: \restylefloat{figure}
-#+LaTeX_HEADER: \usepackage{hyperref}
-#+LaTeX_HEADER: \usepackage{tabularx}
-#+LaTeX_HEADER: \hypersetup{urlcolor=blue}
-#+LaTex_HEADER: \usepackage{titlesec}
-#+LaTex_HEADER: \setcounter{secnumdepth}{4}
-#+LaTeX_HEADER: \usepackage{minted}
-#+LaTeX_HEADER: \setminted{frame=single,framesep=10pt}
-#+LaTeX_HEADER: \chead{}
-#+LaTeX_HEADER: \rhead{\today}
-#+LaTeX_HEADER: \cfoot{}
-#+LaTeX_HEADER: \rfoot{\thepage\ of \pageref{LastPage}}
-#+LaTeX_HEADER: \usepackage[parfill]{parskip}
-#+LaTeX_HEADER:\usepackage{subfig}
-#+LaTex_HEADER: \usepackage[sort&compress, numbers]{natbib}
-#+LaTeX_HEADER: \hypersetup{colorlinks=true,linkcolor=black, citecolor=black}
-#+LATEX_HEADER_EXTRA:  \usepackage{framed}
-#+LATEX_HEADER_EXTRA: \usepackage{mathtools, cases}
-#+LATEX: \maketitle
-#+LATEX: \clearpage
-#+LATEX: \tableofcontents
-#+LATEX: \clearpage
 
 * Setup
 
   #+BEGIN_SRC ipython :session :ipyfile '((:name "network" :filename "obipy-resources/network.png" :caption "" :attr_html ":width 350px" :attr_latex ":width 15cm"))
-  from image_to_network import make_network
+  from image_to_network import get_network_from_paired
   import numpy as np
   import networkx as nx
   import matplotlib.pyplot as plt
 
-  g = make_network("./Testing/test2.png")
+  g = get_network_from_paired("./Paired/col0_20.png")
   pos = {}
   for idx in list(g.nodes):
       pos[idx] = (np.array(g.nodes[idx]['centroid'])[::-1])
@@ -51,7 +20,7 @@
 
 #+RESULTS:
 :RESULTS:
-# Out [154]:
+# Out [1994]:
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
@@ -69,29 +38,30 @@
   import network_diffusion
   np.random.seed(1994)
 
-  A = nx.to_numpy_matrix(g)
-  A[A > 0] = 1
-  D = np.diag(np.array(A.sum(axis=1)).flatten())
-  C = np.around(np.random.random(A.shape)*100) * D
-  R = 1/10
+  A,C = network_diffusion.extract_graph_info(g)
+  R = 1/100
   dt = 1
 
   def plot_network(g, C):
       fig, ax = plt.subplots(1)
-      _ = nx.draw(g, pos, ax=ax, with_labels=False, node_size=np.diag(C))
-      _ = nx.draw_networkx_labels(g, pos, labels={k: np.around(v) for k, v in zip(list(g.nodes), np.diag(C))} , ax=ax)
+      _ = nx.draw(g, pos, ax=ax, with_labels=False, node_size=np.diag(C)*1000)
+      _ = nx.draw_networkx_labels(g, pos, labels={k: np.around(v,2) for k, v in zip(list(g.nodes), np.diag(C))} , ax=ax)
 
   plot_network(g, C)
-  diffuser = network_diffusion.diffuse(A,C,D,R,dt)
-  Cs = [next(diffuser) for i in range(10)]
-  plot_network(g, Cs[0])
+
+
+  Cs = []
+  for i in range(10):
+      C = network_diffusion.beta_diffusion(A, C, R, 2)
+      Cs.append(C)
+  plot_network(g, Cs[-1])
 
 
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [155]:
+# Out [2007]:
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
@@ -106,11 +76,58 @@
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/b29aec2100c8f4dcdaf77ebe1c319d9655647b99/2514f758743d6c9719a0e1e06e5d65abac7d3807.png]]
+[[file:obipy-resources/094d829fb814646df9eee340e2c94aa36947cf2d/296a0f49b536439625c1c8f71d64cbd85ed43f32.png]]
 :END:
 
 
+*** Play with weights
+#+BEGIN_SRC ipython :session
+  g = get_network_from_paired("./Paired/col0_20.png")
+  A = nx.to_numpy_matrix(g)
+  R = A/2
 
+  edge_conv = {}
+  for idx, (n,d) in enumerate(g.nodes(data=True)):
+      edge_conv[idx] = n
+      print(n,d)
+
+  edges = []
+  A = np.triu(A)
+  for i,j in np.ndindex(A.shape):
+     if A[j,i] > 0:
+        edges.append((edge_conv[j],edge_conv[i], {"weight": R[j,i]}))
+
+
+  for u,v,a in g.edges(data=True):
+      print(u, v, a)
+
+
+
+
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [808]:
+# output
+1 {'labels': [1], 'centroid': (436, 510), 'uid': 0, 'intensity': 0.98}
+2 {'labels': [2], 'centroid': (407, 438), 'uid': 1, 'intensity': 0.2}
+4 {'labels': [4], 'centroid': (538, 515), 'uid': 2, 'intensity': 0.16}
+5 {'labels': [5], 'centroid': (455, 556), 'uid': 3, 'intensity': 0.83}
+6 {'labels': [6], 'centroid': (485, 430), 'uid': 4, 'intensity': 0.59}
+7 {'labels': [7], 'centroid': (494, 555), 'uid': 5, 'intensity': 0.24}
+1 2 {'weight': 1.0, 'count': 206}
+1 4 {'weight': 1.0, 'count': 314}
+1 5 {'weight': 1.0, 'count': 211}
+1 6 {'weight': 1.0, 'count': 160}
+2 6 {'weight': 1.0, 'count': 192}
+4 5 {'weight': 1.0, 'count': 67}
+4 6 {'weight': 1.0, 'count': 89}
+4 7 {'weight': 1.0, 'count': 219}
+5 7 {'weight': 1.0, 'count': 216}
+
+:END:
 
 
 
@@ -119,7 +136,6 @@
   nums = iter(np.arange(0, 100))
   for n in g.nodes():
       g[n]['name'] = next(nums)
-
 #+END_SRC
 
 #+RESULTS:
@@ -140,83 +156,171 @@ TypeError: 'AtlasView' object does not support item assignment
 ** Test matrix multiplications work out
 #+BEGIN_SRC ipython :session
 A = np.array([[0,1,0], [1,0,1], [0,1,0]])
-C = np.array([[0.5,0,0], [0,1,0], [0,0,0.5]])
+C = np.array([[0.2,0,0], [0,1,0], [0,0,0.6]])
 D = np.array([[1,0,0], [0,2,0], [0,0,1]])
 R = 1/10
 O = C*R*D
 I = np.diag(np.sum((A * np.sum(C*R, axis=1)), axis=1) )
 Cn = C - O + I
-
+print(C)
+print('\n')
+print(f'variables given are O:\n{O} \n \n I:\n{I}')
+print('\n')
+print(Cn)
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [157]:
-:END:
-
-
-#+BEGIN_SRC ipython :session
-A = np.array(nx.to_numpy_matrix(g))
-A[A > 0] = 1
-D = np.diag(np.array(A.sum(axis=1)).flatten())
-C = np.around(np.random.random(A.shape)*100) * D
-R = 1/10
-dt = 1
-O = C*R*D
-I = np.diag(np.sum((A * np.sum(C*R, axis=1)), axis=1))
-Cn = C - O + I
-#+END_SRC
-
-#+RESULTS:
-:RESULTS:
-# Out [529]:
-:END:
-
-
-** Testing diffusion matrices
-#+BEGIN_SRC ipython :session
-  from network_diffusion import diffuse
-
-  A = np.array([[0,1,0], [1,0,1], [0,1,0]])
-  C = np.array([[0.5,0,0], [0,1,0], [0,0,0.5]])
-  D = np.array([[1,0,0], [0,2,0], [0,0,1]])
-  R = 1/10
-  dt = 1
-
-  diffuser = diffuse(A,C,D,R,dt)
-
-  for i in range(5):
-      Cn = next(diffuser)
-      print(Cn)
-
-
-#+END_SRC
-
-#+RESULTS:
-:RESULTS:
-# Out [156]:
+# Out [562]:
 # output
-[[0.55 0.   0.  ]
- [0.   0.9  0.  ]
- [0.   0.   0.55]]
-[[0.585 0.    0.   ]
- [0.    0.83  0.   ]
- [0.    0.    0.585]]
-[[0.6095 0.     0.    ]
- [0.     0.781  0.    ]
- [0.     0.     0.6095]]
-[[0.62665 0.      0.     ]
- [0.      0.7467  0.     ]
- [0.      0.      0.62665]]
-[[0.638655 0.       0.      ]
- [0.       0.72269  0.      ]
- [0.       0.       0.638655]]
+[[0.2 0.  0. ]
+ [0.  1.  0. ]
+ [0.  0.  0.6]]
+
+
+variables given are O:
+[[0.02 0.   0.  ]
+ [0.   0.2  0.  ]
+ [0.   0.   0.06]]
+
+ I:
+[[0.1  0.   0.  ]
+ [0.   0.08 0.  ]
+ [0.   0.   0.1 ]]
+
+
+[[0.28 0.   0.  ]
+ [0.   0.88 0.  ]
+ [0.   0.   0.64]]
 
 :END:
 
 
-\clearpage
+*** Test they work for variable R
+
+#+BEGIN_SRC ipython :session
+A = np.array([[0,1,0], [1,0,1], [0,1,0]])
+C = np.array([[0.2,0,0], [0,1,0], [0,0,0.6]])
+D = np.array([[1,0,0], [0,2,0], [0,0,1]])
+r = 1/10
+R = A*r # Still keeping solid 1/10 factor to test
+
+O = np.diag(np.sum((R*np.diag(C)), axis=0))
+I = np.diag(np.sum(R*np.diag(C), axis=1))
+
+Cn = C - O + I
+print(C)
+
+Cn = Cn - O + I
+print(Cn)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [1116]:
+# output
+[[0.2 0.  0. ]
+ [0.  1.  0. ]
+ [0.  0.  0.6]]
+[[0.36 0.   0.  ]
+ [0.   0.76 0.  ]
+ [0.   0.   0.68]]
+
+:END:
+
+
+
+*** Fix WRT to R proper representations
+
+#+BEGIN_SRC ipython :session
+A = np.array([[0,1,0], [1,0,1], [0,1,0]])
+C = np.array([[1,0,0], [0,0.5,0], [0,0,1]])
+D = np.array([[1,0,0], [0,2,0], [0,0,1]])
+Mx = 1/20 # 5pc, this can be set from what we observe in the literature for transfer rates
+R = A*Mx
+Ex = R*np.diag(C)
+Ex[Ex > Mx]=Mx
+O = np.diag(np.sum(Ex, axis=0))
+I = np.diag(np.sum(Ex, axis=1))
+
+
+Cn = C - O + I
+
+print(C)
+print('\n')
+print(np.sum(C))
+print('\n')
+
+
+print(Cn)
+print('\n')
+print(np.sum(Cn))
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [2196]:
+# output
+[[1.  0.  0. ]
+ [0.  0.5 0. ]
+ [0.  0.  1. ]]
+
+
+2.5
+
+
+[[0.975 0.    0.   ]
+ [0.    0.55  0.   ]
+ [0.    0.    0.975]]
+
+
+2.5
+
+:END:
+
+
+#+BEGIN_SRC ipython :session
+  from network_diffusion import update_edge_weights, weights_to_A
+
+  g = get_network_from_paired("./Paired/col0_20.png")
+  A, C = extract_graph_info(g)
+  edge_weights = np.around(np.random.rand(len(g.edges)), 2)
+
+  print(weights_to_A(g, edge_weights))
+
+  # weight_mat = np.triu(A)
+
+  # list_of_coords = np.where(weight_mat == 1)
+  # weight_mat[list_of_coords] = edge_weights
+
+  # print(weight_mat)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [1538]:
+# output
+[[0.   0.98 0.22 0.38 0.5  0.  ]
+ [0.   0.   0.   0.   0.93 0.  ]
+ [0.   0.   0.   0.94 0.82 0.87]
+ [0.   0.   0.   0.   0.   0.46]
+ [0.   0.   0.   0.   0.   0.  ]
+ [0.   0.   0.   0.   0.   0.  ]]
+
+:END:
+
+
+
+#+BEGIN_SRC ipython :session
+
+#+END_SRC
+
+
 * Diffusion
+
+/n.b./ $R$ cannot exceed $1/D_i$
+
 For network diffusion we use the adjacency matrix $A$ the concentration matrix $C$ and the exchange per connection (i.e. PD rate) $R$ to calculate the incoming and outgoing concentration of some molecule. To calculate the outgoing we use the following:
 
 \begin{equation}

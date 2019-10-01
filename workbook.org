@@ -14,7 +14,7 @@ edge_map[mask] = [1, 1, 1]
 
 #+RESULTS:
 :RESULTS:
-# Out [273]:
+# Out [652]:
 :END:
 
 
@@ -57,6 +57,20 @@ gs = [mw(f) for f in files]
 
 #+END_SRC
 
+#+RESULTS:
+:RESULTS:
+# Out [653]:
+# output
+/Users/hughesn/anaconda3/envs/playground/lib/python3.6/site-packages/matplotlib/cbook/deprecation.py:107: MatplotlibDeprecationWarning: Passing one of 'on', 'true', 'off', 'false' as a boolean is deprecated; use an actual boolean (True/False) instead.
+  warnings.warn(message, mplDeprecation, stacklevel=1)
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/09d27e786981fb40bcfba3137536cb40db29c201.png]]
+:END:
+
 #+BEGIN_SRC ipython :session
 plt.imshow(plt.imread(paired[2]))
 #+END_SRC
@@ -92,17 +106,17 @@ plt.imshow(plt.imread(paired[2]))
 
 #+RESULTS:
 :RESULTS:
-# Out [647]:
+# Out [654]:
 # text/plain
 : <Figure size 720x720 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/6138cfefb12563711e377994d5bae0210c8bc300/0d5d4b8e5fa3fa15ac293f7654e531b39e02643a.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/c33a5bbd5e772242d989fc009e58508766863bc3.png]]
 :END:
 
 
 #+BEGIN_SRC ipython :session
-
+from skimage.color import label2rgb, rgb2gray
 inp, mask = read_img_pair(paired[2])
 g = make_network(mask)
 _, image_labels, edge_map = get_img_labels_edge_map(mask)
@@ -125,19 +139,341 @@ calc_grayvalues(inp, image_labels, g)
 
 #+RESULTS:
 :RESULTS:
-# Out [646]:
+# Out [656]:
 # text/plain
 : {1: 0.82, 2: 0.15}
+:END:
+
+
+* Estimate Kitawaga
+#+BEGIN_SRC ipython :session
+
+  import pandas as pd
+  import numpy as np
+  import networkx as nx
+  import matplotlib.pyplot as plt
+  kit = pd.read_csv('./Data/kitagawa_estimations.csv')
+  tp0 = kit[kit['H'] == 0].set_index('ABA').drop('H', axis=1)
+  tp14 = kit[kit['H'] == 14].set_index('ABA').drop('H', axis=1)
+
+  # Setup graphs
+
+  ABA = 0
+
+  kit_vals = iter(tp0.loc[ABA].values)
+
+  start, stop = -2, 3
+  G = nx.Graph()
+  for i in range(start, stop):
+      G.add_node(i)
+      G.nodes[i]['intensity'] = next(kit_vals)
+      if i > start:
+          G.add_edge(i-1, i)
+  pos = {k:(k,0) for k, v in G.nodes(data=True)}
+  fig, ax = plt.subplots(1)
+  _ = nx.draw(G, pos)
+  _ = nx.draw_networkx_labels(G, pos, labels={k: v['intensity'] for k,v in G.nodes(data=True)} ,ax=ax)
+
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [1340]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/d7248050473b4eb269ef799c60e2e3638ed51bfd.png]]
+:END:
+
+#+BEGIN_SRC ipython :session
+  A, C = extract_graph_info(G)
+  Cs = []
+  for i in range(10):
+      C = network_diffusion.beta_diffusion(A, C, 0.1, dt)
+      Cs.append(C)
+  print(np.around(C,3))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [1838]:
+# output
+[[0.106 0.    0.    0.    0.   ]
+ [0.    0.225 0.    0.    0.   ]
+ [0.    0.    0.339 0.    0.   ]
+ [0.    0.    0.    0.225 0.   ]
+ [0.    0.    0.    0.    0.106]]
+
+:END:
+
+
+
+#+BEGIN_SRC ipython :session
+  A, C = extract_graph_info(G)
+  X = np.zeros(A.shape)
+
+  def edge_decay(A, R):
+      # A is a 2D array
+      B = np.diag(A).copy()
+      B[0] = B[0] - R
+      B[-1] = B[-1] - R
+      B[B<0] = 0
+      return np.diag(B)
+  R = np.array([1/100])
+
+  for _ in range(10):
+      C = beta_diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[[R[0]]])
+      X = C.copy()
+  print(np.diag(np.around(C, 3)))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [1840]:
+# output
+[0.    0.084 0.825 0.084 0.   ]
+
+:END:
+
+
+#+BEGIN_SRC ipython :session
+  from network_diffusion import extract_graph_info, diffuser, beta_diffusion
+  from scipy.optimize import leastsq
+
+  A, C = extract_graph_info(G)
+  R =  np.array([1e-5])
+  dt = 60
+  tt = (60*60*14) / dt # Number of model estimations to make
+
+  kit14_vals = tp14.loc[ABA].values
+
+  def edge_decay(A, R):
+      # A is a 2D array
+      B = np.diag(A).copy()
+      B[0] = B[0] - R
+      B[-1] = B[-1] - R
+      B[B<0] = 0
+      return np.diag(B)
+
+  def minimise_R(R):
+      A, C = extract_graph_info(G)
+      X = np.zeros(A.shape)
+      for _ in range(int(tt)):
+          C = beta_diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[[R[0]]] )
+          X = C.copy()
+      X = np.diag(X)
+      err = np.square(X[2] - kit14_vals[2])
+      return err
+
+  popt, pcov = leastsq(minimise_R, 0)
+
+  print(popt)
+  print(pcov)
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [1841]:
+# output
+[0.00121183]
+2
+
+:END:
+
+#+BEGIN_SRC ipython :session
+  import seaborn as sns
+  sns.set()
+  R = popt
+
+  A, C = extract_graph_info(G)
+  X = np.zeros(A.shape)
+  for _ in range(int(tt)):
+      C = beta_diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[[R[0]]] )
+      X = C.copy()
+  model_output = np.diag(X)
+
+  plt.plot(kit14_vals, label='Kitawga values')
+  plt.plot(model_output, label='Model fit')
+  plt.legend()
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [1842]:
+
 
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/6138cfefb12563711e377994d5bae0210c8bc300/4ee517bea9fe0e4d05bd998dddb8f6d9b52a5ab6.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/f4277357804dc8183aa61196154b6eeb2f63dc99.png]]
+:END:
+
+
+
+** The meaning of R
+In our models, R is given as a percentage value for which a single cell-to-cell connection can exchange.
+R is used to
+
+
+#+BEGIN_SRC ipython :session
+print(f"This shows that the loss percentage per cell per minute is {R}")
+print(f"Or to be more understandable: each cell exchanges {(R*60):.2f}% per neighbour")
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [996]:
+# output
+This shows that the loss percentage per cell per minute is 0.06997177992896
+Or to be more understandable: each cell exchanges 4.20% per neighbour
+
+:END:
+
+How does this compare to the ground truth?
+
+#+BEGIN_SRC ipython :session
+t0 = 1
+t14 = kit14_vals[2]
+p_change = t0-t14
+print(f"This would give the primary cell an expected loss of {(p_change*100)/14:.2f}% concentration per hour")
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [997]:
+# output
+This would give the primary cell an expected loss of 5.00% concentration per hour
+
+:END:
+
+
+** Minimise for all R
+
+#+BEGIN_SRC ipython :session :async t
+  from network_diffusion import extract_graph_info, diffuser, beta_diffusion
+  from scipy.optimize import curve_fit
+
+
+  A, C = extract_graph_info(G)
+  R =  np.array([1e-2])
+  dt = 60
+  tt = (60*60*14) / dt # Number of model estimations to make
+
+  ydata = tp14.loc[ABA].values
+  tmp = np.zeros(len(ydata)+2)
+  tmp[1:-1] = ydata
+  ydata = tmp
+  xdata = np.arange(-3, 4)
+
+
+  def edge_decay(A, e1, e2):
+      # A is a 2D array
+      B = np.diag(A).copy()
+      B[0] = B[0] - e1
+      B[-1] = B[-1] - e2
+      B[B<0] = 0
+      return np.diag(B)
+
+
+  def minimise_R_mv(x, e1, e2, e3, e4, e5, e6):
+      A, C = extract_graph_info(G)
+      X = np.zeros(len(A)+2)
+      E = weights_to_A(G, np.array([e1, e2, e3, e4]))
+      for _ in range(int(tt)):
+          C = beta_diffusion(A, C, E, dt, rules=[edge_decay], rules_args=[np.array([e5,e6])], Mx=1)
+      X[1:-1] = np.diag(C)
+      return X
+
+  popt, pcov = curve_fit(minimise_R_mv, xdata, ydata, p0=np.array([1e-3, 1e-3, 1e-3, 1e-3, 1e-5, 1e-5 ]), bounds=(0,0.5))
+  print("popt is presented as measurements per second")
+  print(popt)
+  print(pcov)
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [2077]:
+# output
+[2.64120213e-05 1.23983240e-05 2.52849264e-05 3.66546778e-05
+ 5.54751609e-07 2.93182507e-06]
+[[ 1.46007849e-33 -2.67408506e-34  4.88744684e-35  2.19167369e-33
+  -2.82791547e-35  1.16628809e-34]
+ [-2.67408506e-34  3.32202382e-34 -1.74175008e-34 -1.72785067e-34
+   6.94986589e-35 -7.05875832e-35]
+ [ 4.88744684e-35 -1.74175008e-34  1.10516410e-33 -6.51915483e-34
+  -8.36439800e-35  1.22505161e-34]
+ [ 2.19167369e-33 -1.72785067e-34 -6.51915483e-34  3.82322627e-33
+   3.86824256e-35  7.92482064e-35]
+ [-2.82791547e-35  6.94986589e-35 -8.36439800e-35  3.86824256e-35
+   3.31115867e-35 -1.78731967e-35]
+ [ 1.16628809e-34 -7.05875832e-35  1.22505161e-34  7.92482064e-35
+  -1.78731967e-35  4.52481152e-35]]
+
+:END:
+
+
+
+#+BEGIN_SRC ipython :session
+  import seaborn as sns
+  sns.set()
+  dt = 60
+  A, C = extract_graph_info(G)
+  R = weights_to_A(G, np.array(popt)[:-2] )
+  for _ in range(int(tt)):
+      C = beta_diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[ popt[-2:]], Mx=1 )
+  model_output = np.diag(C)
+  plt.plot(ydata[1:-1], label='Kitawga values', linestyle='-', alpha=0.7)
+  plt.plot(model_output, label='Model fit', linestyle='-', alpha=0.7)
+  plt.legend()
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [2087]:
+
 
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/6138cfefb12563711e377994d5bae0210c8bc300/8f49e7b2a880113342e6cc307ddb1b4831fb1eb6.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/5b794ce863675b4865b81f510511513e802b63c6.png]]
+:END:
+
+*** Meaning of R pt2
+
+
+Here we show that for cells -2 through to +2 is:
+
+#+BEGIN_SRC ipython :session
+print(popt[:-2])
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [2076]:
+# output
+[2.20187184e-05 1.12884927e-05 2.67824190e-05 3.93132222e-05]
+
+:END:
+
+How does this compare to the ground truth?
+
+#+BEGIN_SRC ipython :session
+t0 = 1
+t14 = kit14_vals[2]
+p_change = t0-t14
+print(f"This would give the primary cell an expected loss of {(p_change*100)/14:.2f}% concentration per hour")
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [997]:
+# output
+This would give the primary cell an expected loss of 5.00% concentration per hour
+
 :END:
