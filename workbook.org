@@ -326,14 +326,18 @@ calc_grayvalues(inp, image_labels, g)
 
 #+RESULTS:
 :RESULTS:
-# Out [1842]:
+# Out [10]:
+# output
 
+NameErrorTraceback (most recent call last)
+<ipython-input-10-673260745eaf> in <module>
+      1 import seaborn as sns
+      2 sns.set()
+----> 3 R = popt
+      4
+      5 A, C = extract_graph_info(G)
 
-# text/plain
-: <Figure size 432x288 with 1 Axes>
-
-# image/png
-[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/f4277357804dc8183aa61196154b6eeb2f63dc99.png]]
+NameError: name 'popt' is not defined
 :END:
 
 
@@ -377,15 +381,14 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
 
 ** Minimise for all R
 
-#+BEGIN_SRC ipython :session :async t
-  from network_diffusion import extract_graph_info, diffuser, beta_diffusion
+#+BEGIN_SRC ipython :session
+  from network_diffusion import extract_graph_info, diffusion
   from scipy.optimize import curve_fit
 
 
   A, C = extract_graph_info(G)
-  R =  np.array([1e-2])
-  dt = 60
-  tt = (60*60*14) / dt # Number of model estimations to make
+  dt = 10
+  tt = (60*60) / dt # Number of model estimations to make
 
   ydata = tp14.loc[ABA].values
   tmp = np.zeros(len(ydata)+2)
@@ -394,11 +397,11 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
   xdata = np.arange(-3, 4)
 
 
-  def edge_decay(A, e1, e2):
+  def edge_decay(A, edge1, edge2):
       # A is a 2D array
       B = np.diag(A).copy()
-      B[0] = B[0] - e1
-      B[-1] = B[-1] - e2
+      B[0] = B[0] - edge1
+      B[-1] = B[-1] - edge2
       B[B<0] = 0
       return np.diag(B)
 
@@ -408,36 +411,45 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
       X = np.zeros(len(A)+2)
       E = weights_to_A(G, np.array([e1, e2, e3, e4]))
       for _ in range(int(tt)):
-          C = beta_diffusion(A, C, E, dt, rules=[edge_decay], rules_args=[np.array([e5,e6])], Mx=1)
+          C = diffusion(A, C, E, dt, rules=[edge_decay], rules_args=[np.array([e5,e6])], Mx=1)
       X[1:-1] = np.diag(C)
       return X
 
-  popt, pcov = curve_fit(minimise_R_mv, xdata, ydata, p0=np.array([1e-3, 1e-3, 1e-3, 1e-3, 1e-5, 1e-5 ]), bounds=(0,0.5))
-  print("popt is presented as measurements per second")
-  print(popt)
-  print(pcov)
+  popt, pcov = curve_fit(minimise_R_mv, xdata, ydata, p0=np.array([1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3 ]), bounds=(0,0.5))
+
+
+  A, C = extract_graph_info(G)
+  X = np.zeros(A.shape)
+  R = np.array(popt)
+  E = weights_to_A(G, R[:4])
+  for _ in range(int(tt)):
+      C = diffusion(A, C, E, dt, rules=[edge_decay], rules_args=[R[-2:]], Mx=1)
+      X = C.copy()
+
+  from network_diffusion import update_G_attribute
+  vals = np.diag(np.around(C, 3))
+  update_G_attribute(G, 'intensity', vals)
+  import seaborn as sns
+  sns.set()
+  plt.plot(kit14_vals, label='Kitawga values',marker='o')
+  plt.plot(vals, label='Model fit',marker='o')
+  plt.legend()
 
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [2077]:
+# Out [116]:
 # output
-[2.64120213e-05 1.23983240e-05 2.52849264e-05 3.66546778e-05
- 5.54751609e-07 2.93182507e-06]
-[[ 1.46007849e-33 -2.67408506e-34  4.88744684e-35  2.19167369e-33
-  -2.82791547e-35  1.16628809e-34]
- [-2.67408506e-34  3.32202382e-34 -1.74175008e-34 -1.72785067e-34
-   6.94986589e-35 -7.05875832e-35]
- [ 4.88744684e-35 -1.74175008e-34  1.10516410e-33 -6.51915483e-34
-  -8.36439800e-35  1.22505161e-34]
- [ 2.19167369e-33 -1.72785067e-34 -6.51915483e-34  3.82322627e-33
-   3.86824256e-35  7.92482064e-35]
- [-2.82791547e-35  6.94986589e-35 -8.36439800e-35  3.86824256e-35
-   3.31115867e-35 -1.78731967e-35]
- [ 1.16628809e-34 -7.05875832e-35  1.22505161e-34  7.92482064e-35
-  -1.78731967e-35  4.52481152e-35]]
+[(-2, {'intensity': 0.08}), (-1, {'intensity': 0.15}), (0, {'intensity': 0.3}), (1, {'intensity': 0.2}), (2, {'intensity': 0.1})]
 
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/45278ee5c2413756b9a222f410b646b56c808f0d.png]]
 :END:
 
 
@@ -449,7 +461,7 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
   A, C = extract_graph_info(G)
   R = weights_to_A(G, np.array(popt)[:-2] )
   for _ in range(int(tt)):
-      C = beta_diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[ popt[-2:]], Mx=1 )
+      C = diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[ popt[-2:]], Mx=1 )
   model_output = np.diag(C)
   plt.plot(ydata[1:-1], label='Kitawga values', linestyle='-', alpha=0.7)
   plt.plot(model_output, label='Model fit', linestyle='-', alpha=0.7)
@@ -458,14 +470,14 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
 
 #+RESULTS:
 :RESULTS:
-# Out [2087]:
+# Out [85]:
 
 
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/5b794ce863675b4865b81f510511513e802b63c6.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/a757150eeb06b3a635f4a2577afc4f38691d9261.png]]
 :END:
 
 *** Meaning of R pt2

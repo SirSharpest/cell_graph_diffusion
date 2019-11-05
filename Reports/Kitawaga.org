@@ -1,0 +1,186 @@
+* Setup
+** Make initial graph and add some parameters
+#+BEGIN_SRC ipython :session
+  import pandas as pd
+  import numpy as np
+  import networkx as nx
+  import matplotlib.pyplot as plt
+
+  kit = pd.read_csv('./Data/kitagawa_estimations.csv')
+  tp0 = kit[kit['H'] == 0].set_index('ABA').drop('H', axis=1)
+  tp14 = kit[kit['H'] == 14].set_index('ABA').drop('H', axis=1)
+  dt = 1
+  # Setup graphs
+  ABA = 0
+
+
+
+
+  def init_Kitawaga_G():
+      kit_vals = iter(tp0.loc[ABA].values)
+      start, stop = -2, 3
+      G = nx.Graph()
+      for i in range(start, stop):
+          G.add_node(i)
+          G.nodes[i]['intensity'] = next(kit_vals)
+          if i > start:
+              G.add_edge(i-1, i)
+      pos = {k:(k,0) for k, v in G.nodes(data=True)}
+      return G, pos
+
+  G, pos = init_Kitawaga_G()
+  fig, ax = plt.subplots(1)
+  _ = nx.draw(G, pos)
+  _ = nx.draw_networkx_labels(G, pos, labels={k: v['intensity'] for k,v in G.nodes(data=True)} ,ax=ax)
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [9]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/363e790216cf9d6f3f8ecbfe0f135097e39de36b.png]]
+:END:
+
+* Parameter balancing
+** Simple single parameter optimising
+
+#+BEGIN_SRC ipython :session
+  from network_diffusion import extract_graph_info,  diffusion
+  from scipy.optimize import leastsq
+
+  G, pos = init_Kitawaga_G()
+  A, C = extract_graph_info(G)
+  R =  np.array([1e-5])
+  dt = 60
+  tt = (60*60*14) / dt # Number of model estimations to make
+  kit14_vals = tp14.loc[ABA].values
+
+  def edge_decay(A, R):
+      # A is a 2D array
+      B = np.diag(A).copy()
+      B[0] = B[0] - R
+      B[-1] = B[-1] - R
+      B[B<0] = 0
+      return np.diag(B)
+
+  def minimise_R(R):
+      A, C = extract_graph_info(G)
+      X = np.zeros(A.shape)
+      for _ in range(int(tt)):
+          C = diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[[R[0]]] )
+          X = C.copy()
+      X = np.diag(X)
+      err = np.mean(np.square(X - kit14_vals))
+      return err
+
+  popt, pcov = leastsq(minimise_R, 0)
+
+  A, C = extract_graph_info(G)
+  X = np.zeros(A.shape)
+  tt = (60*60*14) / dt # Number of model estimations to make
+  R = np.array(popt)
+  for _ in range(int(tt)):
+      C = diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[[R[0]]])
+      X = C.copy()
+
+  from network_diffusion import update_G_attribute
+  vals = np.diag(np.around(C, 3))
+  update_G_attribute(G, 'intensity', vals)
+  import seaborn as sns
+  sns.set()
+  plt.plot(kit14_vals, label='Kitawga values',marker='o')
+  plt.plot(vals, label='Model fit',marker='o')
+  plt.legend()
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [10]:
+# output
+[(-2, {'intensity': 0.109}), (-1, {'intensity': 0.219}), (0, {'intensity': 0.311}), (1, {'intensity': 0.219}), (2, {'intensity': 0.109})]
+
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/007b5ec27f307abc83701ae3e8b8993544b277e9.png]]
+:END:
+
+** Individual parameters
+
+#+BEGIN_SRC ipython :session
+  from network_diffusion import extract_graph_info, diffusion, weights_to_A
+  from scipy.optimize import curve_fit
+
+  G, pos = init_Kitawaga_G()
+  A, C = extract_graph_info(G)
+
+  dt = 10
+  tt = (60*60) / dt # Number of model estimations to make
+  kit14_vals = tp14.loc[ABA].values
+
+
+  ydata = tp14.loc[ABA].values
+  tmp = np.zeros(len(ydata)+2)
+  tmp[1:-1] = ydata
+  ydata = tmp
+  xdata = np.arange(-3, 4)
+
+  def edge_decay(A, e1, e2):
+      # A is a 2D array
+      B = np.diag(A).copy()
+      B[0] = B[0] - e1
+      B[-1] = B[-1] - e2
+      B[B<0] = 0
+      return np.diag(B)
+
+  def minimise_R(X, e1,e2,e3,e4,e5,e6):
+      A, C = extract_graph_info(G)
+      X = np.zeros(len(A)+2)
+      E = weights_to_A(G, np.array([e1, e2, e3, e4]))
+      for _ in range(int(tt)):
+          C = diffusion(A, C, E, dt, rules=[edge_decay], rules_args=[np.array([e5,e6])], Mx=1)
+      X[1:-1] = np.diag(C)
+      return X
+
+  popt, pcov = curve_fit(minimise_R, xdata, ydata, p0=np.array([1e-3, 1e-3, 1e-3, 1e-3, 1e-5, 1e-5 ]), bounds=(0,0.5))
+
+
+  A, C = extract_graph_info(G)
+  X = np.zeros(A.shape)
+  R = np.array(popt)
+  E = weights_to_A(G, R[:4])
+  for _ in range(int(tt)):
+      C = diffusion(A, C, E, dt, rules=[edge_decay], rules_args=[R[-2:]], Mx=1)
+      X = C.copy()
+
+  from network_diffusion import update_G_attribute
+  vals = np.diag(np.around(C, 3))
+  update_G_attribute(G, 'intensity', vals)
+  import seaborn as sns
+  sns.set()
+  plt.plot(kit14_vals, label='Kitawga values',marker='o')
+  plt.plot(vals, label='Model fit',marker='o')
+  plt.legend()
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [11]:
+# output
+[(-2, {'intensity': 0.08}), (-1, {'intensity': 0.15}), (0, {'intensity': 0.3}), (1, {'intensity': 0.2}), (2, {'intensity': 0.1})]
+
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/45278ee5c2413756b9a222f410b646b56c808f0d.png]]
+:END:
