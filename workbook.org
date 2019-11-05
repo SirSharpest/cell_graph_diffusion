@@ -1,7 +1,8 @@
 #+BEGIN_SRC ipython :session
 from glob import glob as gb
+import numpy as np
 import matplotlib.pyplot as plt
-files = gb("/Users/hughesn//PHD/Datasets/Images/Faulkner2013/Normalised/30nov11_Col0_mRFP.lif/*.png")
+files = gb("/Users/hughesn/PHD/Datasets/Images/Faulkner2013/Normalised/30nov11_Col0_mRFP.lif/*.png")
 
 img_loc = files[0]
 orig = plt.imread(img_loc)
@@ -14,7 +15,7 @@ edge_map[mask] = [1, 1, 1]
 
 #+RESULTS:
 :RESULTS:
-# Out [652]:
+# Out [1]:
 :END:
 
 
@@ -25,21 +26,36 @@ edge_map[mask] = [1, 1, 1]
 from image_to_network import make_network as mw
 from glob import glob as gb
 import matplotlib.pyplot as plt
-files = gb("/Users/hughesn//PHD/Datasets/Images/Faulkner2013/Normalised/30nov11_Col0_mRFP.lif/*.png")
-gs = [mw(files[idx], draw=True, save_loc=f"./graphs/{idx}.png") for idx in range(len(files))]
+from skimage.io import imread
+
+files = gb("/Users/hughesn/PHD/Datasets/Images/Faulkner2013/Normalised/30nov11_Col0_mRFP.lif/*.png")
+idx = 1
+gs = mw(imread(files[idx])[:,:,:3], draw=True, save_loc=f"./graphs/{idx}.png")
 #+END_SRC
 
+#+RESULTS:
+:RESULTS:
+# Out [67]:
+# text/plain
+: <Figure size 3000x3000 with 5 Axes>
 
-#+BEGIN_SRC ipython :session
-gs = [mw(f) for f in files]
-#+END_SRC
+# image/png
+#+attr_html: :width 450px
+#+attr_latex: :width 15cm
+#+caption:
+#+name: graph
+[[file:obipy-resources/graph.png]]
+:END:
+
 
 * Quantify cells
 
 #+BEGIN_SRC ipython :session
   from skimage.measure import label, regionprops
+  import numpy as np
+  import matplotlib.pyplot as plt
   from image_to_network import get_img_labels_edge_map, read_img_pair
-
+  from glob import glob as gb
   paired = gb('./Paired/*.png')
   p = paired[0]
   inp, mask = read_img_pair(p)
@@ -50,8 +66,6 @@ gs = [mw(f) for f in files]
       x, y = np.split(p.coords, [-1], axis=1)
       mask2d[x, y] = 1
       image_overlayed = np.where(mask2d[..., None], inp, 0)
-
-
   plt.imshow(mask)
   plt.grid('off')
 
@@ -59,32 +73,28 @@ gs = [mw(f) for f in files]
 
 #+RESULTS:
 :RESULTS:
-# Out [653]:
-# output
-/Users/hughesn/anaconda3/envs/playground/lib/python3.6/site-packages/matplotlib/cbook/deprecation.py:107: MatplotlibDeprecationWarning: Passing one of 'on', 'true', 'off', 'false' as a boolean is deprecated; use an actual boolean (True/False) instead.
-  warnings.warn(message, mplDeprecation, stacklevel=1)
-
+# Out [68]:
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/09d27e786981fb40bcfba3137536cb40db29c201.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/d7d2d51a7ffbf36a765043ab9f241048a20912e0.png]]
 :END:
 
 #+BEGIN_SRC ipython :session
-plt.imshow(plt.imread(paired[2]))
+plt.imshow(plt.imread(paired[1]))
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [637]:
+# Out [71]:
 
 
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/6138cfefb12563711e377994d5bae0210c8bc300/ba924a9e2fedbc0edd5d0e5d6c25e5093a31e2fa.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/1c36227fabcb4eaf0fbd96875333a021ce3295f0.png]]
 :END:
 
 
@@ -106,18 +116,19 @@ plt.imshow(plt.imread(paired[2]))
 
 #+RESULTS:
 :RESULTS:
-# Out [654]:
+# Out [72]:
 # text/plain
 : <Figure size 720x720 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/c33a5bbd5e772242d989fc009e58508766863bc3.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/9890d7a5d5e1cff5331bd3c1106e036739fe5daa.png]]
 :END:
 
 
 #+BEGIN_SRC ipython :session
+from image_to_network import make_network
 from skimage.color import label2rgb, rgb2gray
-inp, mask = read_img_pair(paired[2])
+inp, mask = read_img_pair(paired[1])
 g = make_network(mask)
 _, image_labels, edge_map = get_img_labels_edge_map(mask)
 
@@ -139,15 +150,22 @@ calc_grayvalues(inp, image_labels, g)
 
 #+RESULTS:
 :RESULTS:
-# Out [656]:
+# Out [75]:
 # text/plain
-: {1: 0.82, 2: 0.15}
+: {1: 0.81,
+:  2: 0.29,
+:  3: 0.25,
+:  4: 0.32,
+:  5: 0.19,
+:  7: 0.41,
+:  8: 0.72,
+:  9: 0.19,
+:  12: 0.13}
 :END:
 
 
 * Estimate Kitawaga
 #+BEGIN_SRC ipython :session
-
   import pandas as pd
   import numpy as np
   import networkx as nx
@@ -155,9 +173,8 @@ calc_grayvalues(inp, image_labels, g)
   kit = pd.read_csv('./Data/kitagawa_estimations.csv')
   tp0 = kit[kit['H'] == 0].set_index('ABA').drop('H', axis=1)
   tp14 = kit[kit['H'] == 14].set_index('ABA').drop('H', axis=1)
-
+  dt = 1
   # Setup graphs
-
   ABA = 0
 
   kit_vals = iter(tp0.loc[ABA].values)
@@ -179,32 +196,37 @@ calc_grayvalues(inp, image_labels, g)
 
 #+RESULTS:
 :RESULTS:
-# Out [1340]:
+# Out [81]:
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/d7248050473b4eb269ef799c60e2e3638ed51bfd.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/363e790216cf9d6f3f8ecbfe0f135097e39de36b.png]]
 :END:
 
 #+BEGIN_SRC ipython :session
+  from network_diffusion import extract_graph_info, diffuser, beta_diffusion
   A, C = extract_graph_info(G)
+  dt = 0.5
   Cs = []
-  for i in range(10):
-      C = network_diffusion.beta_diffusion(A, C, 0.1, dt)
+  # Testing over a 12hr simulation!
+  for i in range(int((12*60*60)/dt)):
+      C = beta_diffusion(A, C, 0.1, dt)
       Cs.append(C)
   print(np.around(C,3))
+  print(np.sum(C))
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [1838]:
+# Out [94]:
 # output
-[[0.106 0.    0.    0.    0.   ]
- [0.    0.225 0.    0.    0.   ]
- [0.    0.    0.339 0.    0.   ]
- [0.    0.    0.    0.225 0.   ]
- [0.    0.    0.    0.    0.106]]
+[[0.2 0.  0.  0.  0. ]
+ [0.  0.2 0.  0.  0. ]
+ [0.  0.  0.2 0.  0. ]
+ [0.  0.  0.  0.2 0. ]
+ [0.  0.  0.  0.  0.2]]
+1.0000000000000009
 
 :END:
 
@@ -213,7 +235,7 @@ calc_grayvalues(inp, image_labels, g)
 #+BEGIN_SRC ipython :session
   A, C = extract_graph_info(G)
   X = np.zeros(A.shape)
-
+  tt = (60*60*14) / dt # Number of model estimations to make
   def edge_decay(A, R):
       # A is a 2D array
       B = np.diag(A).copy()
@@ -221,19 +243,21 @@ calc_grayvalues(inp, image_labels, g)
       B[-1] = B[-1] - R
       B[B<0] = 0
       return np.diag(B)
-  R = np.array([1/100])
+  R = np.array([2.08806883e-05])
 
-  for _ in range(10):
+  for _ in range(int(tt)):
       C = beta_diffusion(A, C, R, dt, rules=[edge_decay], rules_args=[[R[0]]])
       X = C.copy()
   print(np.diag(np.around(C, 3)))
+  print(np.sum(np.diag(np.around(C, 3))))
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [1840]:
+# Out [103]:
 # output
-[0.    0.084 0.825 0.084 0.   ]
+[0.115 0.217 0.3   0.217 0.115]
+0.964
 
 :END:
 
@@ -276,9 +300,9 @@ calc_grayvalues(inp, image_labels, g)
 
 #+RESULTS:
 :RESULTS:
-# Out [1841]:
+# Out [97]:
 # output
-[0.00121183]
+[2.08806883e-05]
 2
 
 :END:

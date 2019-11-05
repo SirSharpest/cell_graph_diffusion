@@ -10,33 +10,13 @@ def check_negative_values(A):
         raise ValueError(f"Matrix cannot contain negative values! {A}")
 
 
-def diffuser(A, C, R, dt, rules=[], rules_args=[]):
-    # TODO: Enforce rules_args
-    check_negative_values(A)
-    A = np.array(A)
-    C = np.copy(C)
-    D = np.diag(np.array(A.sum(axis=1)).flatten())
-    R = R/dt
-    while True:
-        I = np.diag(np.sum((A * (np.sum(C*R, axis=1))),
-                           axis=1))
-        O = C*R*D
-        for f, args in zip(rules, rules_args):
-            try:
-                C = f(C, *args)
-            except TypeError:
-                raise ValueError("Rules arguments not declared")
-        C = C-O+I
-        yield C
-
-
 def enforce_matrix_shape(I, O):
     if type(I) != np.ndarray or I.shape != O.shape:
         I = (I*O)
     return I
 
 
-def beta_diffusion(A, C, E, dt, Mx=1/10, rules=[], rules_args=[]):
+def diffusion(A, C, E, dt, Mx=1/10, rules=[], rules_args=[]):
     """
     A  is the adj matrix
     C  is the concentration matrix
@@ -108,6 +88,13 @@ def get_args():
     ap.add_argument("-d", "--draw", default='False')
     args = vars(ap.parse_args())
     return args
+
+
+def update_G_attribute(G, attr, new_attrs):
+    nx.set_node_attributes(G, {n: v for (n, d), v in zip(
+        G.nodes(data=True), new_attrs)}, attr)
+    print(G.nodes(data=True))
+    return True
 
 
 def main():

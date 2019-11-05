@@ -18,12 +18,7 @@ def read_img_pair(img_loc):
     return input_image, mask_image
 
 
-def get_img_labels_edge_map(img):
-    if isinstance(img, str):
-        orig = imread(img)
-    else:
-        orig = img[:, :, :3]
-
+def get_img_labels_edge_map(orig):
     image = np.copy(orig)
     mask = np.where(image[:, :, 0] > 200)
     edge_map = np.zeros(image.shape)
@@ -71,8 +66,8 @@ def calc_grayvalues(inp, image_labels, g):
     return grayvals
 
 
-def make_network(img_loc, draw=False, save_loc=None):
-    orig, image_labels, edge_map = get_img_labels_edge_map(img_loc)
+def make_network(mask, draw=False, save_loc=None):
+    orig, image_labels, edge_map = get_img_labels_edge_map(mask)
     g = graph.rag_boundary(image_labels, edge_map)
     g.remove_node(0)
     if draw:
