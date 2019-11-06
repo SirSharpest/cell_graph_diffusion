@@ -231,126 +231,316 @@
 
   popt, pcov = curve_fit(minimise_R, xdata, ydata, p0=np.array([1e-30, 1e-30, 1e-30, 1e-30, 1e-30]), bounds=(0,0.5/dt))
 
-  A, C = extract_graph_info(G)
-  X = np.zeros(A.shape)
-  R = np.array(popt)
-  E = weights_to_A(G, R[:4])
-  for _ in range(int(tt)):
-      C = diffusion(A, C, E, dt, rules=[decay], rules_args=[[popt[-1]]], Mx=1)
-      X = C.copy()
-  print(np.diag(X))
-
-  vals = np.diag(np.around(C, 3))
-  plt.plot(kit14_vals, label='Kitawga values',marker='o')
-  plt.plot(vals, label='Model fit',marker='o')
-  plt.legend()
+  print(popt)
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [345]:
+# Out [530]:
 # output
-[0.08 0.15 0.3  0.2  0.1 ]
-[(-2, {'intensity': 0.08}), (-1, {'intensity': 0.15}), (0, {'intensity': 0.3}), (1, {'intensity': 0.2}), (2, {'intensity': 0.1})]
+[2.13668343e-05 1.22481205e-05 1.81067367e-05 1.82313719e-05
+ 2.21796326e-04]
 
-
-
-# text/plain
-: <Figure size 432x288 with 1 Axes>
-
-# image/png
-[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/45278ee5c2413756b9a222f410b646b56c808f0d.png]]
 :END:
 
-
-
-*** Test
-#+BEGIN_SRC ipython :session
-  G, pos = init_Kitawaga_G()
-  A, C = extract_graph_info(G)
-  X = np.zeros(A.shape)
-  R = np.array(popt)
-  E = weights_to_A(G, R[:4])
-
-  T = []
-  for _ in range(int(tt*2)):
-      C = diffusion(A, C, E, dt, rules=[edge_decay], rules_args=[R[-2:]], Mx=1)
-      X = C.copy()
-      T.append(np.diag(np.around(C, 3)))
-#+END_SRC
-
-#+RESULTS:
-:RESULTS:
-# Out [207]:
-:END:
 
 
 
 ** Animate
+
 #+BEGIN_SRC ipython :session
-    from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation
+A, C = extract_graph_info(G)
+X = np.zeros(A.shape)
+R = np.array(popt)
+E = weights_to_A(G, R[:4])
+T= []
+for _ in range(int(tt*10)):
+    C = diffusion(A, C, E, dt, rules=[decay], rules_args=[[popt[-1]]], Mx=1)
+    X = C.copy()
+    T.append(np.diag(X))
+fig, ax = plt.subplots(1)
 
-    fig, ax = plt.subplots(1)
+def animate(i):
+    ax.clear()
+    ax.set_ylim(-0.1,1.1)
+    data = T[int(i*60*30/dt)]
+    ax.set_title(f"{i/2} hours post photo-activation | control treatment")
+    ax.plot(kit14_vals, label='Kitawga values',marker='o')
+    p = ax.plot(data, label='Model estimation', marker='x')
+    plt.legend()
+    return p
 
-    def animate(i):
-        vals = iter(T)
-        ax.clear()
-        ax.set_ylim(-0.1,1.1)
-        data = [next(vals) for _ in range(int((60*60*(i))/dt)+1 )][-1]
-        ax.set_title(f"{i} hours post photo-activation | control treatment")
-        ax.plot(kit14_vals, label='Kitawga values',marker='o')
-        p = ax.plot(data, label='Model estimation', marker='x')
-        plt.legend()
-        return p
+anim = FuncAnimation(fig, animate, frames=30, interval=200, blit=True)
 
-    anim = FuncAnimation(fig, animate, frames=15, interval=200, blit=True)
-
-    anim.save('test.gif', writer='imagemagick')
+anim.save('simulate_kit_ctrl_tmp.gif', writer='imagemagick')
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [215]:
+# Out [525]:
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/29b9d42bdf77e3daa73e2c61a5db5ad17fd044c5.png]]
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/ec68131b2b5e24d442c6f1d99e6173ff56d0e7c8.png]]
 :END:
 
 
 
 * Test for dynamic optimisation
+
+
+** Idea 1
 #+BEGIN_SRC ipython :session
 
   from string import ascii_letters as letters
-
-
-  N = 5
+  G, pos = init_Kitawaga_G()
+  #def optimals_for_G(G, ydata, num_seconds, dt=60):
+  ydata = tp14.loc[ABA].values
+  num_seconds=60*60*14
+  dt=60
+  A, C = extract_graph_info(G)
+  tt = num_seconds/dt # Number of model estimations to make
+  tmp = np.zeros(len(ydata)+2)
+  tmp[1:-1] = ydata
+  ydata = tmp
+  xdata = np.arange(0, len(np.diag(C))+2 )
+  N = len(G.edges)+1 # +1 for decay
   l = iter(list(letters))
   i = [next(l) for _ in range(N)]
   args = ",".join(i)
+  def decay(A, gamma):
+      # A is a 2D array
+      B = np.diag(A).copy()
+      B = B*(1-gamma)
+      B[B<0] = 0
+      return np.diag(B)
 
-  f_maker =f"""
-  def f(X,{args}):
-        A, C = extract_graph_info(G)
-        X = np.zeros(len(A)+2)
-        E = weights_to_A(G, np.array([{args}][:-1]))
-        for _ in range(int(tt)):
-            C = diffusion(A, C, E, dt, rules=[edge_decay], rules_args=[np.array([{args}][-1])], Mx=1)
-        X[1:-1] = np.diag(C)
-        return X
-  """
+  f_str = f"""def f(X,{args}):
+    A, C = extract_graph_info(G)
+    X = np.zeros(len(A)+2)
+    E = weights_to_A(G, np.array([{args}][:-1]))
+    for _ in range(int(tt)):
+        C = diffusion(A, C, E, dt, rules=[decay], rules_args=[[np.array([{args}][-1])]], Mx=1)
+    X[1:-1] = np.diag(C)
+    return X"""
+
+  exec(f_str)
+
+  def fit(args):
+          popt, pcov = curve_fit(f, xdata, ydata,
+                                 p0=np.array([1e-10 for _ in range(len(args.split(',')) )]),
+                                 bounds=(0, 0.5/dt))
+
+  popt, pcov = fit(args)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [431]:
+# output
+
+ValueErrorTraceback (most recent call last)
+<ipython-input-431-22bad02634e2> in <module>
+     39                                bounds=(0, 0.5/dt))
+     40
+---> 41 popt, pcov = fit(args)
+
+<ipython-input-431-22bad02634e2> in fit(args)
+     37         popt, pcov = curve_fit(f, xdata, ydata,
+     38                                p0=np.array([1e-10 for _ in range(len(args.split(',')) )]),
+---> 39                                bounds=(0, 0.5/dt))
+     40
+     41 popt, pcov = fit(args)
+
+~/anaconda3/envs/playground/lib/python3.6/site-packages/scipy/optimize/minpack.py in curve_fit(f, xdata, ydata, p0, sigma, absolute_sigma, check_finite, bounds, method, jac, **kwargs)
+    745
+    746         res = least_squares(func, p0, jac=jac, bounds=bounds, method=method,
+--> 747                             **kwargs)
+    748
+    749         if not res.success:
+
+~/anaconda3/envs/playground/lib/python3.6/site-packages/scipy/optimize/_lsq/least_squares.py in least_squares(fun, x0, jac, bounds, method, ftol, xtol, gtol, x_scale, loss, f_scale, diff_step, tr_solver, tr_options, jac_sparsity, max_nfev, verbose, args, kwargs)
+    797         x0 = make_strictly_feasible(x0, lb, ub)
+    798
+--> 799     f0 = fun_wrapped(x0)
+    800
+    801     if f0.ndim != 1:
+
+~/anaconda3/envs/playground/lib/python3.6/site-packages/scipy/optimize/_lsq/least_squares.py in fun_wrapped(x)
+    792
+    793     def fun_wrapped(x):
+--> 794         return np.atleast_1d(fun(x, *args, **kwargs))
+    795
+    796     if method == 'trf':
+
+~/anaconda3/envs/playground/lib/python3.6/site-packages/scipy/optimize/minpack.py in func_wrapped(params)
+    452     if transform is None:
+    453         def func_wrapped(params):
+--> 454             return func(xdata, *params) - ydata
+    455     elif transform.ndim == 1:
+    456         def func_wrapped(params):
+
+<string> in f(X, a, b, c, d, e, f)
+
+~/Google Drive/PHD/Modelling/Network Modelling/network_diffusion.py in weights_to_A(g, weights)
+     59     for w in (W1, W2):
+     60         list_of_coords = np.where(w == 1)
+---> 61         w[list_of_coords] = weights
+     62         W += w
+     63     return W
+
+ValueError: shape mismatch: value array of shape (5,) could not be broadcast to indexing result of shape (4,)
+:END:
+
+** Idea 2
+
+#+BEGIN_SRC ipython :session
+  # G, pos = init_Kitawaga_G()
+  # ydata = tp14.loc[ABA].values
+  # num_seconds=60*60*14
+  # dt=60
+  # A, C = extract_graph_info(G)
+  # tt = num_seconds/dt # Number of model estimations to make
+  # tmp = np.zeros(len(ydata)+2)
+  # tmp[1:-1] = ydata
+  # ydata = tmp
+  # xdata = np.arange()
+  # N = len(G.edges)+1 # +1 for decay
+  # l = iter(list(letters))
+  # i = [next(l) for _ in range(N)]
+
+  G, pos = init_Kitawaga_G()
+  A, C = extract_graph_info(G)
+
+  dt = 60
+  tt = (60*60*14)/dt # Number of model estimations to make
+  kit14_vals = tp14.loc[ABA].values
 
 
-  exec(f_maker)
+  ydata = tp14.loc[ABA].values
+  tmp = np.zeros(len(ydata)+2)
+  tmp[1:-1] = ydata
+  ydata = tmp
+  xdata = np.arange(-3, 4)
+
+  def decay(A, gamma):
+      # A is a 2D array
+      B = np.diag(A).copy()
+      B = B*(1-gamma)
+      B[B<0] = 0
+      return np.diag(B)
 
 
+  def f(x, *xargs):
+    A, C = extract_graph_info(G)
+    Y = np.zeros(len(A)+2)
+    E = weights_to_A(G, np.array(xargs[:-1]))
+    for _ in range(int(tt)):
+        C = diffusion(A, C, E, dt, rules=[decay], rules_args=[[xargs[-1]]], Mx=1)
+    Y[1:-1] = np.diag(C)
+    return Y
+  p0 = np.array([1e-10 for _ in range(N)])
+  p0[-1] = p0[-1]/100
+  popt, pcov = curve_fit(f, xdata, ydata,
+                        p0=p0,
+                        bounds=(0, 0.5/dt))
 
+
+  A, C = extract_graph_info(G)
+  X = np.zeros(A.shape)
+  R = np.array(popt)
+  E = weights_to_A(G, R[:-1])
+  T= []
+  for _ in range(int(tt)):
+      C = diffusion(A, C, E, dt, rules=[decay], rules_args=[[popt[-1]]], Mx=1)
+      X = C.copy()
+      T.append(np.diag(X))
+  fig, ax = plt.subplots(1)
+  ax.plot(T[-1])
+  plt.plot(ydata[1:-1])
+  ax.set_ylim(0,1)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [571]:
+# text/plain
+: (0, 1)
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/18e1983a18e666d76e5d666ee7f156211c72f60a.png]]
+:END:
+
+
+#+BEGIN_SRC ipython :session
+
+fig, ax = plt.subplots(1)
+ax.set_yscale('log')
+ax.scatter(np.arange(len(popt[:-1])), popt[:-1])
 
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [263]:
+# Out [504]:
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/cf88e455866714c63901c4f942aff79e26412240.png]]
+:END:
+
+
+#+BEGIN_SRC ipython :session
+plt.plot(ydata)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [509]:
+# text/plain
+: [<matplotlib.lines.Line2D at 0x7fede9695630>]
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/11ec155a4df51992f365ae68a1524cf37a0702f9.png]]
+:END:
+
+
+#+BEGIN_SRC ipython :session
+A, C = extract_graph_info(G)
+X = np.zeros(A.shape)
+R = np.array(popt)
+E = weights_to_A(G, R[:-1])
+T= []
+for _ in range(int(tt)):
+    C = diffusion(A, C, E, dt, rules=[decay], rules_args=[[popt[-1]]], Mx=1)
+    X = C.copy()
+    T.append(np.diag(X))
+fig, ax = plt.subplots(1)
+ax.plot(T[250][::-1])
+plt.plot(ydata[1:-1])
+ax.set_ylim(0,1)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [516]:
+# text/plain
+: (0, 1)
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/b67947b14d25f455af97bfd017f0b695c80af07e.png]]
 :END:
