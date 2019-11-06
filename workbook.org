@@ -385,7 +385,7 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
   from network_diffusion import extract_graph_info, diffusion
   from scipy.optimize import curve_fit
 
-
+  G, pos = init_Kitawaga_G()
   A, C = extract_graph_info(G)
   dt = 10
   tt = (60*60) / dt # Number of model estimations to make
@@ -431,15 +431,15 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
   update_G_attribute(G, 'intensity', vals)
   import seaborn as sns
   sns.set()
-  plt.plot(kit14_vals, label='Kitawga values',marker='o')
-  plt.plot(vals, label='Model fit',marker='o')
+  plt.plot(kit14_vals, label='Kitawga values',marker='o', alpha=0.3)
+  plt.plot(vals, label='Model fit',marker='o', alpha=0.3)
   plt.legend()
 
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [116]:
+# Out [286]:
 # output
 [(-2, {'intensity': 0.08}), (-1, {'intensity': 0.15}), (0, {'intensity': 0.3}), (1, {'intensity': 0.2}), (2, {'intensity': 0.1})]
 
@@ -449,7 +449,7 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/45278ee5c2413756b9a222f410b646b56c808f0d.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/e5e1437e29d1c6ccc2fdf38689b3c4d379c39d4c.png]]
 :END:
 
 
