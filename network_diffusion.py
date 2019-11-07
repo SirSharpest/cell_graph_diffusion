@@ -3,6 +3,7 @@ import image_to_network
 import argparse
 from random import choice
 import networkx as nx
+from scipy.optimize import curve_fit
 
 
 def check_negative_values(A):
@@ -95,6 +96,37 @@ def update_G_attribute(G, attr, new_attrs):
         G.nodes(data=True), new_attrs)}, attr)
     print(G.nodes(data=True))
     return True
+
+
+def fit_G_to_data(G, ydata, tt, dt=60):
+    def decay(A, gamma):
+        # A is a 2D array
+        B = np.diag(A).copy()
+        B = B*(1-gamma)
+        B[B < 0] = 0
+        return np.diag(B)
+
+    tmp = np.zeros(len(ydata)+2)
+    tmp[1:-1] = ydata
+    ydata = tmp
+    xdata = np.arange(-3, 4)
+    tt = tt/dt  # Number of model estimations to make
+
+    def f(x, *xargs):
+        A, C = extract_graph_info(G)
+        Y = np.zeros(len(A)+2)
+        E = weights_to_A(G, np.array(xargs[:-1]))
+        for _ in range(int(tt)):
+            C = diffusion(A, C, E, dt, rules=[
+                          decay], rules_args=[[xargs[-1]]], Mx=1)
+        Y[1:-1] = np.diag(C)
+        return Y
+    p0 = np.array([1e-6 for _ in range(len(G.nodes))])
+    p0[-1] = p0[-1]/100
+    popt, pcov = curve_fit(f, xdata, ydata,
+                           p0=p0,
+                           bounds=(0, 0.5/dt))
+    return popt, pcov
 
 
 def main():
