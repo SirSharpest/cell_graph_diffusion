@@ -518,12 +518,49 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
 * Working on class based system
 
 #+BEGIN_SRC ipython :session
-from network_diffusion import CellNetwork
+  from network_diffusion import CellNetwork
+  import numpy as np
 
-G = CellNetwork()
+  G = CellNetwork()
+
+  for shape in ['triangle', 'rectangle', 'hexagon']:
+      np.random.seed(6)
+      G.generate_shape(shape, n=5,m=5)
+      G.diffuse(1,1,1)
+      fig, ax = plt.subplots(1)
+      sizes={k: v['C'] for k,v in G.nodes(data=True)}
+      nx.draw(G, ax=ax, node_size=np.array(list(sizes.values()))*2000, labels=sizes)
+      ax.set_title(shape)
+
+
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [82]:
+# Out [560]:
+# output
+
+ValueErrorTraceback (most recent call last)
+<ipython-input-560-9a07017cf2ab> in <module>
+      7     np.random.seed(6)
+      8     G.generate_shape(shape, n=5,m=5)
+----> 9     G.diffuse(1,1,1)
+     10     fig, ax = plt.subplots(1)
+     11     sizes={k: v['C'] for k,v in G.nodes(data=True)}
+
+~/Google Drive/PHD/Modelling/Network Modelling/network_diffusion.py in diffuse(self, D, dt, epochs, rules, rules_args)
+     63         A = np.array(A)
+     64         C = np.copy(C)
+---> 65         E = enforce_matrix_shape(E, A) * dt
+     66         Mx = enforce_matrix_shape(self.edge_lim, A) * dt
+     67         Ex = E*np.diag(C)
+
+~/Google Drive/PHD/Modelling/Network Modelling/network_diffusion.py in enforce_matrix_shape(I, O)
+     94 def enforce_matrix_shape(I, O):
+     95     if type(I) != np.ndarray or I.shape != O.shape:
+---> 96         I = (I*O)
+     97     return I
+     98
+
+ValueError: operands could not be broadcast together with shapes (40,) (25,25)
 :END:

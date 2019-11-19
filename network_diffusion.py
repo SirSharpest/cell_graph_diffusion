@@ -4,11 +4,102 @@ import argparse
 from random import choice
 import networkx as nx
 from scipy.optimize import curve_fit
+from networkx.generators.lattice import grid_2d_graph, hexagonal_lattice_graph, triangular_lattice_graph
 
 
 class CellNetwork(nx.classes.graph.Graph):
-    def __init__(self, incoming_graph_data=None, **args):
+    def __init__(self,  incoming_graph_data=None, **args):
         super(CellNetwork, self).__init__(incoming_graph_data=None, **args)
+        self.node_attr = 'C'
+        self.edge_attr = 'E'
+        self.edge_lim = 1/10
+
+    def generate_shape(self, shape, n=1, m=1):
+        # Warning, will erase currently held information in the network
+        func_dict = {'rectangle': grid_2d_graph,
+                     'hexagon': hexagonal_lattice_graph,
+                     'triangle': triangular_lattice_graph}
+        f = func_dict[shape]
+        G = f(m, n)
+        self.__dict__.update(G.__dict__)
+        self.set_edges()
+        self.set_concentration()
+
+    def update_node_attribute(self, attr, new_attrs):
+        nx.set_node_attributes(self, {n: v for (n, d), v in zip(
+            self.nodes(data=True), new_attrs)}, attr)
+
+    def update_edge_attribute(self, attr, new_attrs):
+        nx.set_edge_attributes(self, {(u, v): va for (u, v, a), va in zip(
+            self.edges(data=True), new_attrs)}, attr)
+
+    def set_concentration(self, C=None):
+        if C is not None:
+            self.update_node_attribute(self.node_attr, C)
+            return
+        centre = nx.algorithms.distance_measures.center(self)[0]
+        idx = list(self.nodes()).index(centre)
+        IC = np.zeros(self.number_of_nodes())
+        IC[idx] = 1
+        self.update_node_attribute(self.node_attr, IC)
+
+    def set_edges(self, E=None):
+        if E is not None:
+            self.update_edge_attribute(self.edge_attr, E)
+            return
+        IC = np.ones(self.number_of_edges()) * self.edge_lim
+        self.update_edge_attribute(self.edge_attr, IC)
+
+    def get_concentration(self):
+        return list(nx.get_node_attributes(self, self.node_attr).values())
+
+    def get_weights(self):
+        return list(nx.get_edge_attributes(self, self.edge_attr).values())
+
+    def diffuse(self, D, dt, epochs, rules=[], rules_args=[]):
+        A, C = self.extract_graph_info()
+        E = self.weights_to_A()
+        check_negative_values(C)
+        self.A = np.array(A)
+        C = np.copy(C)
+        E = enforce_matrix_shape(E, A) * dt
+        Mx = enforce_matrix_shape(self.edge_lim, A) * dt
+        Ex = E*np.diag(C)
+        Ex[Ex > Mx] = Mx[Mx < Ex]
+        I = np.sum(Ex, axis=1)
+        O = np.sum(Ex, axis=0)
+        C = np.diag(np.diag(C)-O+I)
+
+        for f, args in zip(rules, rules_args):
+            C = f(C, *args)
+
+        return C
+
+    def extract_graph_info(self):
+        A = nx.to_numpy_array(self)
+        A[A > 0] = 1
+        C = np.diag(np.array(self.get_concentration()))
+        return A, C
+
+    def check_negative_values(self, A):
+        if np.any(A < 0):
+            raise ValueError(f"Matrix cannot contain negative values! {A}")
+
+    def weights_to_A(self):
+        A = nx.to_numpy_array(self)
+        W1 = np.triu(A)
+        W2 = np.tril(A)
+        W = np.zeros(A.shape)
+        for w in (W1, W2):
+            list_of_coords = np.where(w == 1)
+            w[list_of_coords] = self.get_weights()
+            W += w
+        return W
+
+    def enforce_matrix_shape(self, I, O):
+        if type(I) != np.ndarray or I.shape != O.shape:
+            I = (I*O)
+        return I
 
 
 def check_negative_values(A):
@@ -99,7 +190,6 @@ def get_args():
 def update_G_attribute(G, attr, new_attrs):
     nx.set_node_attributes(G, {n: v for (n, d), v in zip(
         G.nodes(data=True), new_attrs)}, attr)
-    print(G.nodes(data=True))
     return True
 
 
@@ -123,8 +213,8 @@ def fit_G_to_data(G, ydata, tt, dt=60):
         E = weights_to_A(G, np.array(xargs[:-1]))
         for _ in range(int(tt)):
             C = diffusion(A, C, E, dt, rules=[
-                          decay], rules_args=[[xargs[-1]]], Mx=1)
-        Y[1:-1] = np.diag(C)
+                decay], rules_args=[[xargs[-1]]], Mx=1)
+        Y[1: -1] = np.diag(C)
         return Y
     p0 = np.array([1e-6 for _ in range(len(G.nodes))])
     p0[-1] = p0[-1]/100
