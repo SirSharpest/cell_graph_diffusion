@@ -1,4 +1,5 @@
 * Setup
+
 ** Make initial graph and add some parameters
 #+BEGIN_SRC ipython :session
   import pandas as pd
@@ -34,13 +35,103 @@
 
 #+RESULTS:
 :RESULTS:
-# Out [21]:
+# Out [13]:
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
 [[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/363e790216cf9d6f3f8ecbfe0f135097e39de36b.png]]
 :END:
+
+
+** Kitawaga 2018 time course
+
+#+BEGIN_SRC ipython :session
+mock = np.array([0.99,0.96,0.92,0.90,0.87,0.85,0.83,0.81,0.79,0.75, 0.72, 0.35])
+treat = [0.99,0.97,0.94,0.91,0.88,0.87,0.87,0.86,0.86,0.85,0.83, 0.8]
+X = np.zeros(len(mock))
+X[0:-1] = np.arange(0, 151, step=15)
+X[-1] = 60*14
+
+fig, ax = plt.subplots(1)
+ax.plot(X, mock, label='mock')
+ax.plot(X, treat, label='treat')
+#ax.set_xscale('log')
+ax.legend()
+ax.set_title('Kitawaga 2018, fig1 vs. fig2')
+ax.set_ylabel('Concentration')
+ax.set_xlabel('T (minutes)')
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [14]:
+# text/plain
+: Text(0.5,0,'T (minutes)')
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/eb418100ef2a659524700eb92ca69fe05291b263.png]]
+:END:
+
+
+
+
+#+BEGIN_SRC ipython :session
+dat = pd.DataFrame({'mock':mock, 'ABA':treat}, index=X).reset_index().rename(columns={'index':'time'}).melt(id_vars='time')
+fig, ax = plt.subplots(1)
+sns.regplot(data=dat[dat['variable'] == 'mock'], x='time', y='value')
+sns.regplot(data=dat[dat['variable'] == 'mock'][:-1], x='time', y='value', ax=ax)
+ax.set_title('fig2 data mismatch fig1 ctrl')
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [15]:
+# output
+
+NameErrorTraceback (most recent call last)
+<ipython-input-15-b7f99f17f127> in <module>
+      1 dat = pd.DataFrame({'mock':mock, 'ABA':treat}, index=X).reset_index().rename(columns={'index':'time'}).melt(id_vars='time')
+      2 fig, ax = plt.subplots(1)
+----> 3 sns.regplot(data=dat[dat['variable'] == 'mock'], x='time', y='value')
+      4 sns.regplot(data=dat[dat['variable'] == 'mock'][:-1], x='time', y='value', ax=ax)
+      5 ax.set_title('fig2 data mismatch fig1 ctrl')
+
+NameError: name 'sns' is not defined
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/b8b6ae95361eb3107fe305ef6d3cb822eb9989c3.png]]
+:END:
+
+
+#+BEGIN_SRC ipython :session
+mock = np.array([0.99,0.96,0.92,0.90,0.87,0.85,0.83,0.81,0.79,0.75, 0.72])
+treat = [0.99,0.97,0.94,0.91,0.88,0.87,0.87,0.86,0.86,0.85,0.83]
+X = np.arange(0, 151, step=15)
+
+fig, ax = plt.subplots(1)
+ax.plot(X, mock, label='mock')
+ax.plot(X, treat, label='treat')
+ax.legend()
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [16]:
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/997d9564b6a8b7a8190f2b113eec5240e8819c64.png]]
+:END:
+
 
 * Parameter balancing
 ** Simple single parameter optimising
@@ -102,7 +193,7 @@
 
 #+RESULTS:
 :RESULTS:
-# Out [22]:
+# Out [17]:
 # output
 [(-2, {'intensity': 0.065}), (-1, {'intensity': 0.212}), (0, {'intensity': 0.338}), (1, {'intensity': 0.212}), (2, {'intensity': 0.065})]
 
@@ -174,7 +265,7 @@
 
 #+RESULTS:
 :RESULTS:
-# Out [23]:
+# Out [18]:
 # output
 [(-2, {'intensity': 0.0}), (-1, {'intensity': 0.203}), (0, {'intensity': 0.405}), (1, {'intensity': 0.203}), (2, {'intensity': 0.0})]
 
@@ -233,7 +324,7 @@
 
 #+RESULTS:
 :RESULTS:
-# Out [24]:
+# Out [19]:
 # output
 [1.20749464e-05 9.18778872e-06 1.53511286e-05 1.93894286e-05
  1.93456201e-04]
@@ -276,12 +367,12 @@ anim.save('simulate_kit_ctrl_tmp.gif', writer='imagemagick')
 
 #+RESULTS:
 :RESULTS:
-# Out [25]:
+# Out [20]:
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/1f1ea0201a08ac39f1348862b6e7e47774229ab8.png]]
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/f7aebec5a69acbc3541dae0c8b074557317f562f.png]]
 :END:
 
 
@@ -324,7 +415,7 @@ def fit(G, ydata, tt, dt=60):
 
 #+RESULTS:
 :RESULTS:
-# Out [33]:
+# Out [21]:
 :END:
 
 
@@ -339,7 +430,7 @@ popt, pcov = fit(G, ydata, tt)
 
 #+RESULTS:
 :RESULTS:
-# Out [34]:
+# Out [22]:
 :END:
 
 
@@ -365,16 +456,15 @@ ax.legend()
 
 #+RESULTS:
 :RESULTS:
-# Out [35]:
+# Out [23]:
 
 
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/e906e4aace0d117e7a1113b3fa13057a942582f8.png]]
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/debf0905cee441d82cbf2d24e6da22e21b9a85ba.png]]
 :END:
-
 
 ** Model different ABA quantities
 
@@ -409,7 +499,7 @@ ax.legend()
 
 #+RESULTS:
 :RESULTS:
-# Out [39]:
+# Out [24]:
 :END:
 
 
@@ -426,7 +516,7 @@ ax.legend()
 
 #+RESULTS:
 :RESULTS:
-# Out [40]:
+# Out [25]:
 # text/plain
 : <Figure size 1080x504 with 5 Axes>
 
@@ -436,4 +526,394 @@ ax.legend()
 #+caption: Modelled ABA from Kitawaga 2018
 #+name: ABA Modelled
 [[file:obipy-resources/ABA Modelled.png]]
+:END:
+
+
+* Calculate apical/basal rates of flow from Kitagawa 2013
+
+#+BEGIN_SRC ipython :session
+  import tabulate
+  import IPython
+
+  class OrgFormatter(IPython.core.formatters.BaseFormatter):
+      format_type = IPython.core.formatters.Unicode('text/org')
+      print_method = IPython.core.formatters.ObjectName('_repr_org_')
+
+  def pd_dataframe_to_org(df):
+      return tabulate.tabulate(df, headers='keys', tablefmt='orgtbl', showindex='always')
+
+  ip = get_ipython()
+  ip.display_formatter.formatters['text/org'] = OrgFormatter()
+
+  f = ip.display_formatter.formatters['text/org']
+  f.for_type_by_name('pandas.core.frame', 'DataFrame', pd_dataframe_to_org)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [26]:
+:END:
+
+#+BEGIN_SRC ipython :session :display text/org :exports results
+  import pandas as pd
+  f = "./Data/kitawaga2013.xlsx"
+  excel = pd.ExcelFile(f)
+  reps = []
+  for sheet in excel.sheet_names:
+      df = excel.parse(sheet)
+      df['exp'] = sheet[-1]
+      reps.append(df)
+  kit2013 = pd.concat(reps)
+  kit2013.head(10)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [27]:
+# text/org
+|    |   time |   apical |   basal |   exp |
+|----+--------+----------+---------+-------|
+|  0 |      0 |   29.867 |  23.14  |     1 |
+|  1 |     15 |   54.683 |  42.1   |     1 |
+|  2 |     30 |   79.165 |  58.867 |     1 |
+|  3 |     45 |   95.665 |  70.895 |     1 |
+|  4 |     60 |  113.012 |  82.824 |     1 |
+|  0 |      0 |   21.522 |  19.695 |     2 |
+|  1 |     15 |   39.786 |  33.517 |     2 |
+|  2 |     30 |   54.826 |  46.008 |     2 |
+|  3 |     45 |   66.051 |  53.946 |     2 |
+|  4 |     60 |   78.192 |  63.19  |     2 |
+:END:
+
+#+BEGIN_SRC ipython :session
+import seaborn as sns
+data = kit2013.melt(id_vars=['time', 'exp'])
+sns.boxplot(data=data, x='time', y='value', hue='variable')
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [28]:
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/d69660f488c0c3e6fd591fb6a85afdc44af3cfca.png]]
+:END:
+
+** Calculate average rate of change
+#+BEGIN_SRC ipython :session :display text/org :exports results
+  pct_avg_change = kit2013.groupby('time').mean().pct_change()
+  diff_avg_change = kit2013.groupby('time').mean().diff()
+
+  nrml_concentrations = (kit2013.groupby('time').mean()
+                         / kit2013.groupby('time').mean().max()).diff()[1:]
+
+
+  nrml_concentrations
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [29]:
+# text/org
+|   time |   apical |    basal |
+|--------+----------+----------|
+|     15 | 0.226428 | 0.205483 |
+|     30 | 0.208341 | 0.198009 |
+|     45 | 0.164756 | 0.144329 |
+|     60 | 0.173367 | 0.1364   |
+:END:
+
+
+#+BEGIN_SRC ipython :session
+fig, ax = plt.subplots(1, figsize=(8,8))
+sns.barplot(data=nrml_concentrations.reset_index().melt(id_vars='time'), x='time', hue='variable', y='value', ax=ax)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [30]:
+
+
+# text/plain
+: <Figure size 576x576 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/301ae5ffd048b1bb46bd41b77e53af04d4e1244e.png]]
+:END:
+
+#+BEGIN_SRC ipython :session
+fig, ax = plt.subplots(1, figsize=(8,8))
+sns.barplot(data=diff_avg_change.reset_index().melt(id_vars='time'), x='time', hue='variable', y='value', ax=ax)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [31]:
+
+
+# text/plain
+: <Figure size 576x576 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/41e985e360057745cfa94a4cd165722df13ede6e.png]]
+:END:
+
+
+** Infer from network
+*** 1D init function
+#+BEGIN_SRC ipython :session
+  def init_1D_G(size, IC):
+      vals = iter(IC)
+      start, stop = 0, size
+      G = nx.Graph()
+      for i in range(start, stop):
+          G.add_node(i)
+          G.nodes[i]['intensity'] = next(vals)
+          if i > start:
+              G.add_edge(i-1, i)
+      pos = {k:(k,0) for k, v in G.nodes(data=True)}
+      return G, pos
+
+  G, pos = init_1D_G(3, [0,1,0])
+  fig, ax = plt.subplots(1)
+  _ = nx.draw(G, pos)
+  _ = nx.draw_networkx_labels(G, pos, labels={k: v['intensity'] for k,v in G.nodes(data=True)} ,ax=ax)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [32]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/50b5dde0afc1a6c44eb39e500a54d8d5cd8f7237.png]]
+:END:
+
+
+*** Fitting function
+#+BEGIN_SRC ipython :session
+
+def fit_G_to_apical_basal(G, apical, basal , tt, dt=60):
+    def decay(A, gamma):
+        # A is a 2D array
+        B = np.diag(A).copy()
+        B = B*(1-gamma)
+        B[B < 0] = 0
+        return np.diag(B)
+
+    ydata = np.array([apical, basal])
+    tmp = np.zeros(len(ydata)+2)
+    tmp[1:-1] = ydata
+    ydata = tmp
+
+
+    xdata = np.arange(len(G.edges)+2)
+    tt = tt/dt  # Number of model estimations to make
+
+    def f(x, *xargs):
+        A, C = extract_graph_info(G)
+        Y = np.zeros(len(G.edges)+2)
+        E = weights_to_A(G, np.array(xargs[:-1]))
+        for _ in range(int(tt)):
+            C = diffusion(A, C, E, dt, rules=[
+                          decay], rules_args=[[xargs[-1]]], Mx=1)
+        Y[0] = np.diag(C)[0]
+        Y[1] = np.diag(C)[-1]
+        return Y
+
+
+    p0 = np.array([1e-6 for _ in range(len(G.edges)+1)])
+    p0[-1] = p0[-1]/100
+
+    popt, pcov = curve_fit(f, xdata, ydata,
+                           p0=p0,
+                           bounds=(0, 0.5/dt))
+    return popt, pcov
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [33]:
+:END:
+
+
+#+BEGIN_SRC ipython :session
+A, C = extract_graph_info(G)
+dt = 60
+tt=60*60
+t_diff = 60*15
+ydata= nrml_concentrations.mean() / t_diff
+#popt, pcov = fit_G_to_apical_basal(G, ydata['apical'], ydata['basal'], 60*15)
+
+
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [34]:
+:END:
+
+
+#+BEGIN_SRC ipython :session
+A, C = extract_graph_info(G)
+X = np.zeros(A.shape)
+#R = np.array(popt)
+R = ydata.values
+E = weights_to_A(G, R)
+
+T= []
+for _ in range(int(tt/dt)):
+    C = diffusion(A, C, E, dt, Mx=1)
+    X = C.copy()
+    T.append(np.diag(X))
+
+plt.xkcd()
+fig, ax = plt.subplots(1)
+ax.plot(T[15], label='15m', marker='x', alpha=0.3)
+ax.plot(T[30], label='30m', marker='x', alpha=0.3)
+ax.plot(T[45], label='45m', marker='x', alpha=0.3)
+ax.plot(T[-1], label='60m', marker='x', alpha=0.3)
+ax.set_title('Simulating values from Kitagawa 2013')
+ax.legend()
+ax.set_ylim(0,1)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [35]:
+# text/plain
+: (0, 1)
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/e35e9c0d8feea0acc949ab545df1759d9d3f0ec7.png]]
+:END:
+
+*** Are these values consistent with 2018 control values, when modelled?
+
+#+BEGIN_SRC ipython :session
+Gn, pos = init_Kitawaga_G()
+A, C = extract_graph_info(Gn)
+dt = 60
+ydata = tp14.loc[0].values
+tt=60*60*14
+popt, pcov = fit(Gn, ydata, tt)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [36]:
+:END:
+
+
+#+BEGIN_SRC ipython :session
+A, C = extract_graph_info(G)
+X = np.zeros(A.shape)
+R = popt[1:2]
+E = weights_to_A(G, R)
+
+T= []
+for _ in range(int(tt/dt)):
+    C = diffusion(A, C, E, dt, Mx=1)
+    X = C.copy()
+    T.append(np.diag(X))
+
+plt.xkcd()
+fig, ax = plt.subplots(1)
+ax.plot(T[15], label='15m', marker='x', alpha=0.3)
+ax.plot(T[30], label='30m', marker='x', alpha=0.3)
+ax.plot(T[45], label='45m', marker='x', alpha=0.3)
+ax.plot(T[60], label='60m', marker='x', alpha=0.3)
+ax.set_title('Simulating values from Kitagawa 2013 with values from 2018')
+ax.legend()
+ax.set_ylim(0,1)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [37]:
+# text/plain
+: (0, 1)
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/0b60a286e86d634c1dee55443b089ecc94feb713.png]]
+:END:
+
+
+** Calculate changes and interpolate
+
+#+BEGIN_SRC ipython :session
+cell_p1_mock = pd.read_csv("./Data/Cell+1_Mock.csv")
+cell_p1_aba = pd.read_csv("./Data/Cell+1_ABA.csv")
+
+fig, ax = plt.subplots(1)
+ax.plot(cell_p1_mock['Time'], cell_p1_mock['Value'], label='mock', marker='o')
+ax.plot(cell_p1_aba['Time'], cell_p1_aba['Value'], label='aba', marker='x')
+ax.set_ylabel('Intensity')
+ax.set_xlabel('Time')
+ax.legend()
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [63]:
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/7e0b9d3f0aa57965a4e681fa1d92454c336c1039.png]]
+:END:
+
+#+BEGIN_SRC ipython :session
+  from scipy import interpolate
+  from numpy.random import rand
+  x = cell_p1_mock['Time'].values
+  y = cell_p1_mock['Value'].values
+
+
+  def add_jittered_data(x,y, reps = 10):
+      X = np.zeros(len(x)*reps)
+      for i in np.arange(len(X)-1, step=len(x) ):
+          X[i:i+len(x)] = x * (1 + (rand(len(x)) - rand(len(x))))
+
+
+  f = interpolate.interp1d(x,y, fill_value='extrapolate')
+
+  #quarterly_14h = np.arange(0, 60*14, step=14)
+
+  fig, ax = plt.subplots(1)
+  ax.scatter(cell_p1_mock['Time'], cell_p1_mock['Value'], label='mock', marker='o')
+  ax.plot(cell_p1_mock['Time'], f(cell_p1_mock['Time']) , label='interpolated', alpha=0.3)
+  ax.set_ylabel('Intensity')
+  ax.set_xlabel('Time')
+  #ax.set_xscale('logq')
+  ax.legend()
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [76]:
+
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/23492459db627e89e08127b936de8f99d32eb598.png]]
 :END:

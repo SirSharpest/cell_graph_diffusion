@@ -6,6 +6,11 @@ import networkx as nx
 from scipy.optimize import curve_fit
 
 
+class CellNetwork(nx.classes.graph.Graph):
+    def __init__(self, incoming_graph_data=None, **args):
+        super(CellNetwork, self).__init__(incoming_graph_data=None, **args)
+
+
 def check_negative_values(A):
     if np.any(A < 0):
         raise ValueError(f"Matrix cannot contain negative values! {A}")
@@ -109,7 +114,7 @@ def fit_G_to_data(G, ydata, tt, dt=60):
     tmp = np.zeros(len(ydata)+2)
     tmp[1:-1] = ydata
     ydata = tmp
-    xdata = np.arange(-3, 4)
+    xdata = np.arange(len(G.nodes)+2)
     tt = tt/dt  # Number of model estimations to make
 
     def f(x, *xargs):

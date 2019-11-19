@@ -15,7 +15,7 @@ edge_map[mask] = [1, 1, 1]
 
 #+RESULTS:
 :RESULTS:
-# Out [1]:
+# Out [4]:
 :END:
 
 
@@ -29,13 +29,13 @@ import matplotlib.pyplot as plt
 from skimage.io import imread
 
 files = gb("/Users/hughesn/PHD/Datasets/Images/Faulkner2013/Normalised/30nov11_Col0_mRFP.lif/*.png")
-idx = 1
+idx = 2
 gs = mw(imread(files[idx])[:,:,:3], draw=True, save_loc=f"./graphs/{idx}.png")
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [67]:
+# Out [7]:
 # text/plain
 : <Figure size 3000x3000 with 5 Axes>
 
@@ -73,7 +73,7 @@ gs = mw(imread(files[idx])[:,:,:3], draw=True, save_loc=f"./graphs/{idx}.png")
 
 #+RESULTS:
 :RESULTS:
-# Out [68]:
+# Out [8]:
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
@@ -82,19 +82,19 @@ gs = mw(imread(files[idx])[:,:,:3], draw=True, save_loc=f"./graphs/{idx}.png")
 :END:
 
 #+BEGIN_SRC ipython :session
-plt.imshow(plt.imread(paired[1]))
+plt.imshow(plt.imread(paired[4]))
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-# Out [71]:
+# Out [12]:
 
 
 # text/plain
 : <Figure size 432x288 with 1 Axes>
 
 # image/png
-[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/1c36227fabcb4eaf0fbd96875333a021ce3295f0.png]]
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/96595ce89b8fcb463841dac2df67dd17fb16ebda.png]]
 :END:
 
 
@@ -512,4 +512,18 @@ print(f"This would give the primary cell an expected loss of {(p_change*100)/14:
 # output
 This would give the primary cell an expected loss of 5.00% concentration per hour
 
+:END:
+
+
+* Working on class based system
+
+#+BEGIN_SRC ipython :session
+from network_diffusion import CellNetwork
+
+G = CellNetwork()
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [82]:
 :END:
