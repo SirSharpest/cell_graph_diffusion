@@ -25,6 +25,11 @@ class CellNetwork(nx.classes.graph.Graph):
         self.set_edges()
         self.set_concentration()
 
+    def existing_shape(self, G):
+        self.__dict__.update(G.__dict__)
+        self.set_edges()
+        self.set_concentration()
+
     def update_node_attribute(self, attr, new_attrs):
         nx.set_node_attributes(self, {n: v for (n, d), v in zip(
             self.nodes(data=True), new_attrs)}, attr)
@@ -32,6 +37,10 @@ class CellNetwork(nx.classes.graph.Graph):
     def update_edge_attribute(self, attr, new_attrs):
         nx.set_edge_attributes(self, {(u, v): va for (u, v, a), va in zip(
             self.edges(data=True), new_attrs)}, attr)
+
+    # def get_centre_c(self):
+    #     centre = nx.algorithms.distance_measures.center(self)[0]
+    #     return self.nodes().index(centre)
 
     def set_concentration(self, C=None):
         if C is not None:
@@ -57,23 +66,22 @@ class CellNetwork(nx.classes.graph.Graph):
         return list(nx.get_edge_attributes(self, self.edge_attr).values())
 
     def diffuse(self, D, dt, epochs, rules=[], rules_args=[]):
-        A, C = self.extract_graph_info()
-        E = self.weights_to_A()
-        check_negative_values(C)
-        self.A = np.array(A)
-        C = np.copy(C)
-        E = enforce_matrix_shape(E, A) * dt
-        Mx = enforce_matrix_shape(self.edge_lim, A) * dt
-        Ex = E*np.diag(C)
-        Ex[Ex > Mx] = Mx[Mx < Ex]
-        I = np.sum(Ex, axis=1)
-        O = np.sum(Ex, axis=0)
-        C = np.diag(np.diag(C)-O+I)
-
-        for f, args in zip(rules, rules_args):
-            C = f(C, *args)
-
-        return C
+        for i in range(epochs):
+            A, C = self.extract_graph_info()
+            E = self.weights_to_A()
+            check_negative_values(C)
+            self.A = np.array(A)
+            C = np.copy(C)
+            E = enforce_matrix_shape(E, A) * D * dt  # added in D here!
+            Mx = enforce_matrix_shape(self.edge_lim, A) * dt
+            Ex = E*np.diag(C)
+            Ex[Ex > Mx] = Mx[Mx < Ex]
+            I = np.sum(Ex, axis=1)
+            O = np.sum(Ex, axis=0)
+            C = np.diag(np.diag(C)-O+I)
+            for f, args in zip(rules, rules_args):
+                C = f(C, *args)
+            self.update_node_attribute(self.node_attr, np.diag(C))
 
     def extract_graph_info(self):
         A = nx.to_numpy_array(self)

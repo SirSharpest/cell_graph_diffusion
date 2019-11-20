@@ -521,15 +521,20 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
   from network_diffusion import CellNetwork
   import numpy as np
 
+  n=5
+  m=5
   G = CellNetwork()
 
-  for shape in ['triangle', 'rectangle', 'hexagon']:
-      np.random.seed(6)
-      G.generate_shape(shape, n=5,m=5)
-      G.diffuse(1,1,1)
-      fig, ax = plt.subplots(1)
-      sizes={k: v['C'] for k,v in G.nodes(data=True)}
-      nx.draw(G, ax=ax, node_size=np.array(list(sizes.values()))*2000, labels=sizes)
+  for shape in ['rectangle', 'triangle', 'hexagon']:
+      np.random.seed(1)
+      G.generate_shape(shape, n=n,m=m)
+      G.diffuse(0.5,1,10)
+      fig, ax = plt.subplots(1, figsize=(8,8))
+      sizes={k: np.around(v['C'],2) for k,v in G.nodes(data=True)}
+      lbls = {}
+      for k,v in sizes.items():
+          lbls[k] = v if v > 0 else ''
+      nx.draw(G, ax=ax, node_size=np.array(list(sizes.values()))*2000, labels=lbls, font_size=16, node_color='y')
       ax.set_title(shape)
 
 
@@ -537,30 +542,22 @@ This would give the primary cell an expected loss of 5.00% concentration per hou
 
 #+RESULTS:
 :RESULTS:
-# Out [560]:
-# output
+# Out [674]:
+# text/plain
+: <Figure size 576x576 with 1 Axes>
 
-ValueErrorTraceback (most recent call last)
-<ipython-input-560-9a07017cf2ab> in <module>
-      7     np.random.seed(6)
-      8     G.generate_shape(shape, n=5,m=5)
-----> 9     G.diffuse(1,1,1)
-     10     fig, ax = plt.subplots(1)
-     11     sizes={k: v['C'] for k,v in G.nodes(data=True)}
+# image/png
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/f05261b0d5ed8fa87aa6c1e52f6fb1859ecea136.png]]
 
-~/Google Drive/PHD/Modelling/Network Modelling/network_diffusion.py in diffuse(self, D, dt, epochs, rules, rules_args)
-     63         A = np.array(A)
-     64         C = np.copy(C)
----> 65         E = enforce_matrix_shape(E, A) * dt
-     66         Mx = enforce_matrix_shape(self.edge_lim, A) * dt
-     67         Ex = E*np.diag(C)
+# text/plain
+: <Figure size 576x576 with 1 Axes>
 
-~/Google Drive/PHD/Modelling/Network Modelling/network_diffusion.py in enforce_matrix_shape(I, O)
-     94 def enforce_matrix_shape(I, O):
-     95     if type(I) != np.ndarray or I.shape != O.shape:
----> 96         I = (I*O)
-     97     return I
-     98
+# image/png
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/4e34e63cc69810dbea8d4e1f57826cd2ffcda51a.png]]
 
-ValueError: operands could not be broadcast together with shapes (40,) (25,25)
+# text/plain
+: <Figure size 576x576 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/56773090603b540ad23ab6991459ad9ca442b699/50d00dfb7c45dd8b00036780af4038b1041043cb.png]]
 :END:
