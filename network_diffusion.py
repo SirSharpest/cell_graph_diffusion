@@ -109,16 +109,14 @@ class CellNetwork(nx.classes.graph.Graph):
             self.nodes(data=True), new_attrs)}, attr)
 
     def set_random_edge_weights(self, mu, sigma):
-        np.random.seed()
         E = np.random.normal(mu, sigma, self.number_of_edges())
-        E[E < 0] = 0
+        E[E < 0] = 1
         E = np.around(E, 2)
         self.set_edges(E)
 
     def set_random_PD_weights(self, mu, sigma):
-        np.random.seed()
         E = np.random.normal(mu, sigma, self.number_of_edges())
-        E[E < 0] = 0
+        E[E < 0] = 1
         E = np.around(E, 2)
         self.set_edges(E, attr=self.PD_attr)
 
@@ -152,7 +150,9 @@ class CellNetwork(nx.classes.graph.Graph):
         IC = np.ones(self.number_of_edges()) * self.edge_default
         self.update_edge_attribute(attr, IC)
 
-    def get_concentration(self):
+    def get_concentration(self, names=False):
+        if names:
+            return nx.get_node_attributes(self, self.node_attr)
         return list(nx.get_node_attributes(self, self.node_attr).values())
 
     def get_weights(self, attr=None):
@@ -166,7 +166,7 @@ class CellNetwork(nx.classes.graph.Graph):
             self.weights_to_A(), A))
 
         PD = (self.enforce_matrix_shape(
-            self.weights_to_A(self.PD_attr), A))
+            self.weights_to_A(self.PD_attr), A)) * np.floor(E)
 
         q_hat = PD * self.q * D
         for i in range(epochs):
