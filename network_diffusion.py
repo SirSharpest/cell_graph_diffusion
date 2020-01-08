@@ -1,13 +1,8 @@
-from scipy.spatial import distance
 import sys
-import scipy.spatial
+from scipy.spatial import distance
 import scipy as sp
 import numpy as np
-import image_to_network
-import argparse
-from random import choice
 import networkx as nx
-from scipy.optimize import curve_fit
 from networkx.generators.lattice import grid_2d_graph
 from networkx.generators.lattice import hexagonal_lattice_graph
 from networkx.generators.lattice import triangular_lattice_graph
@@ -21,10 +16,10 @@ class CellNetwork(nx.classes.graph.Graph):
         self.edge_attr = 'E'
         self.PD_attr = 'PD'
         self.edge_default = 1
+
         self.PD = 1  # Number of PD per unit of cellwall (unit)
         self.units = 5  # micrometers in unit
-        self.q = 1/10  # amount of C a single PD could push through itself to neighbours
-
+        self.q = 0.050  # ~50 nm is pd size
         if n > 0:
             if d == 2:
                 self.add_existing_shape(self.make_2N(n))
@@ -164,17 +159,15 @@ class CellNetwork(nx.classes.graph.Graph):
         A, C = self.extract_graph_info()
         E = (self.enforce_matrix_shape(
             self.weights_to_A(), A))
-
         PD = (self.enforce_matrix_shape(
-            self.weights_to_A(self.PD_attr), A)) * np.floor(E)
-
-        q_hat = PD * self.q * D
+            self.weights_to_A(self.PD_attr), A)) * np.floor(E) * self.q
+        q_hat = PD * D * dt
         for i in range(epochs):
             self.check_negative_values(C)
-            E_hat = E * np.diag(C) * q_hat
+            E_hat = np.diag(C) * q_hat
             I = np.sum(E_hat, axis=1)
             O = np.sum(E_hat, axis=0)
-            C = np.diag(np.diag(C) + dt*(I-O))
+            C = np.diag(np.diag(C) + (I-O))
             self.update_node_attribute(self.node_attr, np.diag(C))
 
     def extract_graph_info(self):
@@ -194,10 +187,14 @@ class CellNetwork(nx.classes.graph.Graph):
         W1 = np.triu(A)
         W2 = np.tril(A)
         W = np.zeros(A.shape)
-        for w in (W1, W2):
-            list_of_coords = np.where(w == 1)
-            w[list_of_coords] = self.get_weights(attr=attr)
-            W += w
+        try:
+            for w in (W1, W2):
+                list_of_coords = np.where(w == 1)
+                w[list_of_coords] = self.get_weights(attr=attr)
+                W += w
+        except ValueError:
+            print('Incorrect setup')
+            return 0
         return W
 
     def enforce_matrix_shape(self, I, O):
