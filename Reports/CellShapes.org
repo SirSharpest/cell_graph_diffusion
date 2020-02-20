@@ -1,0 +1,834 @@
+#+TITLE: Cell topology ideas
+
+#+include: ./preamble.org
+
+* Lattice implementation
+#+BEGIN_SRC ipython :session :exports results
+  import matplotlib.pyplot as plt
+  import networkx as nx
+  import numpy as np
+  import sys
+  sys.path.append("../")
+  from network_diffusion import CellNetwork
+
+  n=7
+  m=7
+
+  D = 0.000001
+  dt = 1
+  epochs=10
+
+  shapes = {}
+  for shape in ['rectangle', 'triangle', 'hexagon']:
+      G = CellNetwork()
+      G.generate_shape(shape, n=n,m=m)
+      G.set_random_PD_weights(100,0.5)
+      G.set_random_edge_weights(100 ,0.5)
+      G.diffuse(D, dt, epochs)
+      sizes={k: np.around(v['C'],2) for k,v in G.nodes(data=True)}
+      pos = nx.nx_agraph.graphviz_layout(G)
+      lbls = {}
+      for k,v in sizes.items():
+          lbls[k] = v if v > 0 else ''
+
+      fig, axes = plt.subplots(1,1, figsize=(5,5))
+      nx.draw(G, ax=axes, node_size=np.array(list(sizes.values()))*2000, font_size=16, node_color='r', pos=pos)
+      axes.set_title(shape)
+      shapes[shape] = G
+
+
+#+END_SRC
+
+#+RESULTS:
+:results:
+# Out [2]: 
+# text/plain
+: <Figure size 360x360 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/4cad12ff07312213558954ac5da21c7f505e8d6a/c6c5dc2db3ee9f93fe31c4517dc26c3d6af07673.png]]
+
+# text/plain
+: <Figure size 360x360 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/4cad12ff07312213558954ac5da21c7f505e8d6a/48b1277f4e930c2526e03c5418f302a0a31c22c6.png]]
+
+# text/plain
+: <Figure size 360x360 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/4cad12ff07312213558954ac5da21c7f505e8d6a/e9502141709516d1da754d6a8b0c0e94f1f91e7e.png]]
+:end:
+
+
+
+** Ego graphs of R = 2
+
+#+BEGIN_SRC ipython :session :exports results
+  for k,Ga in shapes.items():
+      fig, ax = plt.subplots(1)
+      Gn = Ga.get_ego_graph(r=2)
+      posn = nx.nx_agraph.graphviz_layout(Gn)
+      sizes={k: np.around(v['C'],2) for k,v in Gn.nodes(data=True)}
+      nx.draw(Gn, pos=posn, axes=ax, node_size=np.array(list(sizes.values()))*1000)
+      ax.set_title(k)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [180]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/f1092e83107f4e9f031ed16c5e98c47dd87f83db/9748bd509f44b93363115cd02203fea9448aa801.png]]
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/f1092e83107f4e9f031ed16c5e98c47dd87f83db/73f25fc1e7afeecb6d0f96bb93043c5fd37173c1.png]]
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/f1092e83107f4e9f031ed16c5e98c47dd87f83db/baab213f68ed3fb48ab95d5015f4eabf7234febd.png]]
+:END:
+
+
+
+* Voronoi implementation
+
+** Infinite vertices problem
+#+BEGIN_SRC ipython :session :exports results
+from scipy.spatial import Voronoi, voronoi_plot_2d
+np.random.seed(5)
+
+n_cells = 10
+cells = np.around(np.random.rand(n_cells, 2), 2)
+cells[cells < 0.01] = cells[cells < 0.01] + 0.01
+cells[cells > 0.99] = cells[cells > 0.99] - 0.01
+vor = Voronoi(cells)
+fig, ax = plt.subplots(1)
+_ = voronoi_plot_2d(vor, ax=ax)
+ax.set_xlim(-0.5, 1.5)
+ax.set_ylim(-0.5, 1.5)
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [191]:
+# output
+/Users/hughesn/anaconda3/envs/playground/lib/python3.6/site-packages/scipy/spatial/_plotutils.py:20: MatplotlibDeprecationWarning: The ishold function was deprecated in version 2.0.
+  was_held = ax.ishold()
+
+# text/plain
+: (-0.5, 1.5)
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/f1092e83107f4e9f031ed16c5e98c47dd87f83db/a6c2b929045318f1011fc2a3a4fd588efc826c9c.png]]
+:END:
+
+** Bounding box solution
+#+BEGIN_SRC ipython :session :exports results
+  import matplotlib.pyplot as plt
+  import numpy as np
+  import scipy as sp
+  import scipy.spatial
+  import sys
+  import seaborn as sns
+  sns.set()
+
+  np.random.seed(5)
+  eps = sys.float_info.epsilon
+
+  bounding_box = np.array([0., 1., 0., 1.]) # [x_min, x_max, y_min, y_max]
+
+  def in_box(cells, bounding_box):
+      return np.logical_and(np.logical_and(bounding_box[0] <= cells[:, 0],
+                                           cells[:, 0] <= bounding_box[1]),
+                            np.logical_and(bounding_box[2] <= cells[:, 1],
+                                           cells[:, 1] <= bounding_box[3]))
+
+  def voronoi(cells, bounding_box):
+      """
+      Solution based on
+      https://stackoverflow.com/a/33602171
+      with only slight modification
+      """
+      # Select cells inside the bounding box
+      i = in_box(cells, bounding_box)
+      # Mirror points
+      points_center = cells[i, :]
+      points_left = np.copy(points_center)
+      points_left[:, 0] = bounding_box[0] - (points_left[:, 0] - bounding_box[0])
+      points_right = np.copy(points_center)
+      points_right[:, 0] = bounding_box[1] + (bounding_box[1] - points_right[:, 0])
+      points_down = np.copy(points_center)
+      points_down[:, 1] = bounding_box[2] - (points_down[:, 1] - bounding_box[2])
+      points_up = np.copy(points_center)
+      points_up[:, 1] = bounding_box[3] + (bounding_box[3] - points_up[:, 1])
+      points = np.append(points_center,
+                         np.append(np.append(points_left,
+                                             points_right,
+                                             axis=0),
+                                   np.append(points_down,
+                                             points_up,
+                                             axis=0),
+                                   axis=0),
+                         axis=0)
+      # Compute Voronoi
+      vor = sp.spatial.Voronoi(points)
+      # Filter regions
+      regions = []
+      for region in vor.regions:
+          flag = True
+          for index in region:
+              if index == -1:
+                  flag = False
+                  break
+              else:
+                  x = vor.vertices[index, 0]
+                  y = vor.vertices[index, 1]
+                  if not(bounding_box[0] - eps <= x and x <= bounding_box[1] + eps and
+                         bounding_box[2] - eps <= y and y <= bounding_box[3] + eps):
+                      flag = False
+                      break
+          if region != [] and flag:
+              regions.append(region)
+      vor.filtered_points = points_center
+      vor.filtered_regions = regions
+      return vor
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [266]:
+:END:
+
+
+#+BEGIN_SRC ipython :session :exports results
+  import matplotlib.pyplot as plt
+  import numpy as np
+  import scipy as sp
+  import scipy.spatial
+  import sys
+  import seaborn as sns
+  sns.set()
+
+  np.random.seed(5)
+  eps = sys.float_info.epsilon
+
+  n_cells = 10
+  cells = np.around(np.random.rand(n_cells, 2), 2)
+  cells[cells < 0.01] = cells[cells < 0.01] + 0.01
+  cells[cells > 0.99] = cells[cells > 0.99] - 0.01
+
+
+
+  vor = voronoi(cells, bounding_box)
+
+  fig = plt.figure()
+  ax = fig.gca()
+  # Plot initial points
+  ax.plot(vor.filtered_points[:, 0], vor.filtered_points[:, 1], 'b.')
+  # Plot ridges points
+  for region in vor.filtered_regions:
+      vertices = vor.vertices[region]
+      ax.plot(vertices[:, 0], vertices[:, 1], 'go')
+  # Plot ridges
+  for region in vor.filtered_regions:
+      vertices = vor.vertices[region + [region[0]], :]
+      ax.plot(vertices[:, 0], vertices[:, 1], 'k-')
+
+
+  ax.set_xlim(-0.1,1.1)
+  ax.set_ylim(-0.1,1.1)
+
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [267]:
+# text/plain
+: (-0.1, 1.1)
+
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/f1092e83107f4e9f031ed16c5e98c47dd87f83db/a2e6e9940c41a7ed3ac6eed88faecb4be60d3e5d.png]]
+:END:
+
+** Finding shared vertices
+
+#+BEGIN_SRC ipython :session :exports results
+
+  import matplotlib.pyplot as plt
+  import networkx as nx
+  import numpy as np
+  import sys
+  sys.path.append("../")
+  from network_diffusion import CellNetwork
+  from scipy.spatial import distance
+
+
+
+
+
+  fig, ax = plt.subplots(1)
+  G = CellNetwork()
+  ax.set_xlim(-0.1, 1.1)
+  ax.set_ylim(-0.1, 1.1)
+
+  for idx, region in enumerate(vor.filtered_regions):
+      G.add_node(idx)
+      vertices = vor.vertices[region + [region[0]], :]
+      P = 0
+      for idxy in range(len(vertices)-1):
+         P += distance.euclidean(vertices[idxy], vertices[idxy+1])
+      G.nodes[idx]['P'] = P
+
+      G.nodes[idx]['x'], G.nodes[idx]['y']  = centeroidnp(vertices)
+      ax.text(*centeroidnp(vertices), str(idx))
+
+      for idy, r in enumerate(vor.filtered_regions):
+          if idy == idx:
+              continue
+          m = list(set(set(region) & set(r)))
+          ax.plot(vor.vertices[m][:,0], vor.vertices[m][:,1])
+          if len(m) > 1:
+              G.add_edge(idx, idy,
+                         E=np.around(distance.euclidean(vor.vertices[m[0]],
+                                                                  vor.vertices[m[1]]),2))
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [268]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/f1092e83107f4e9f031ed16c5e98c47dd87f83db/8165973d6957264bc9c5f6a396cb6dcef60bd9a6.png]]
+:END:
+
+
+#+BEGIN_SRC ipython :session :exports results
+  fig, ax = plt.subplots(1)
+
+  pos = {}
+  for n in G.nodes(data=True):
+     pos[n[0]] = (n[1]['x'], n[1]['y'])
+
+  nx.draw(G, with_labels=True, ax=ax, pos=pos)
+  for region in vor.filtered_regions:
+     vertices = vor.vertices[region + [region[0]], :]
+     ax.plot(vertices[:, 0], vertices[:, 1], 'k-')
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [269]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/f1092e83107f4e9f031ed16c5e98c47dd87f83db/32aef608b36dfcc64560c88454b9fe4f8445a8a0.png]]
+:END:
+
+
+
+
+** Class implementation
+
+#+BEGIN_SRC ipython :session :exports results
+
+  from network_diffusion import CellNetwork as CN
+
+  fig, ax = plt.subplots(1)
+
+  G = CN()
+  G.generate_voronoi(10, bboxsize=2, seed=5)
+  pos = {}
+  for n in G.nodes(data=True):
+      pos[n[0]] = (n[1]['x'], n[1]['y'])
+  nx.draw(G, pos=pos, ax=ax)
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [360]:
+# text/plain
+: <Figure size 432x288 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/f1092e83107f4e9f031ed16c5e98c47dd87f83db/6bd6d95120c0172eb492f54dd7ab5b3b6d47a2a4.png]]
+:END:
+
+
+* Graph diffusion methods
+
+
+** Model adjustments
+
+Typically, diffusion will consider all points equally i.e. loss $= C_i - \sum{C_{i+n}}$. However, in a modified system we can adjust the normal diffusion equation in 1D from
+
+\begin{equation}
+C^{t+1}_i = C^t_i + \Delta tD \frac{C^t_{i+1} - 2C^{t}_i + C^t_{i-1}}{\Delta x^2}
+\end{equation}
+
+To:
+
+
+\begin{equation}
+C^{t+1}_i = C^t_i + \Delta t \sum_{j=1}^{n}  \bar{q}_{i,j}(C^t_{i+j} -C^t_i)
+\end{equation}
+
+
+Where we remove the $\Delta X$ in the move towards a graph based solution, and can use a value $\bar{q}$ to represent the overall flux potential between $C_i$ and $C_{i+j}$. This uses the $q$ parameter, the openness of a single plasmodesmata (PD), number of PD per unit of cell wall and number of units in the shared wall, $PD, SW$ respectively.
+
+\begin{equation}
+\bar{q} = SW \times {PD} \times q \times D
+\end{equation}
+
+Logically, the change in concentration ($C$) is always limited to the number of PD available and the amount of flux that can move through each PD. Effectively putting a limit on smaller molecules moving incredibly fast... This rule is not implemented in the current model, but may be worth considering if we change the meaning of $q$.
+\begin{equation}
+\Delta C_{i} \Rightarrow \{x \in \mathbb{R}: 0 < x < \sum_{j=1}^n \bar{q}_{i,j} \}
+\end{equation}
+
+
+** Faster computation of results
+
+- $C$ Concentration matrix, each $C_{i=j}$ is a cell.
+- $G$ Graph representation of $C$
+
+
+\begin{equation}
+C = \begin{bmatrix}
+    c_{1,1} & 0 & \dots \\
+    \vdots & \ddots & \\
+    0 &        & c_{i,j}
+    \end{bmatrix}
+\end{equation}
+
+\begin{equation}
+C^{t+1} = C^t + \Delta tD (I - O)
+\end{equation}
+
+*** Exchange / Edge matrix
+
+\begin{align}
+E &= Adj(G)
+\\
+\bar{E} &= E \circ  diag(C) \circ \bar{q}
+\end{align}
+
+*** Incoming / Outgoing
+\begin{align}
+I &= \sum^n_{j=1} \bar{E}_{i,j}
+\\
+O &= \sum^n_{i=1} \bar{E}_{i,j}
+\end{align}
+
+
+
+\clearpage
+* Hypotheses
+
+
+** Cell wall length affects diffusion patterns in cells
+
+1. We assume that variations of cell wall length has a substantial effect on the diffusion profile over time
+
+*** Testing
+1. We set $SW_{i,j} \rightarrow \mathcal{N}(\mu,\,\sigma^{2})$, for all edges.
+2. Run diffusion simulation on a set testing network.
+3. Repeat steps 1,2 with variations in $\sigma$ to see how much variation would be required to achieve a substantial effect, if any.
+
+Further testing could incorporate the Voronoi graphs, here we could investigate if non-normal random positioning and arrangements of cells affect the patterns.
+
+
+
+
+*** Results
+
+**** Examine spread
+
+  #+BEGIN_SRC ipython :session :ipyfile '((:name "radius illustration" :filename "obipy-resources/radius illustration.png" :caption "An illustration of what radius is selecting in the network" :attr_html ":width 850px" :attr_latex ":width 15cm")) :exports results
+import numpy as np
+import pandas as pd
+import time
+import multiprocessing
+import os
+import matplotlib.pyplot as plt
+try:
+    from network_diffusion import CellNetwork
+except ModuleNotFoundError:
+    import sys
+    sys.path.append("../")
+    from network_diffusion import CellNetwork
+
+
+import networkx as nx
+G = CellNetwork()
+G.generate_shape('rectangle', n=9, m=9)
+
+fig, axes = plt.subplots(2,3, figsize=(12,8))
+axes = iter(np.array(axes).flatten())
+
+
+for i in range(int(13//2)):
+    ax = next(axes)
+    ego = G.get_ego_graph(i)
+    pos = nx.nx_agraph.graphviz_layout(ego)
+
+    col_map = []
+
+    for node in ego:
+        if len(ego.nodes()) == 1:
+            col_map.append('green')
+        elif node == (4,4):
+            col_map.append('green')
+        elif node in G.get_ego_graph(i-1):
+            col_map.append('red')
+        else:
+            col_map.append('blue')
+    nx.draw(ego, pos=pos, ax=ax, node_color=col_map)
+    ax.set_title(f"Radius: {i}")
+
+
+  #+END_SRC
+
+  #+RESULTS:
+  :RESULTS:
+  # Out [4]:
+  # text/plain
+  : <Figure size 864x576 with 6 Axes>
+
+  # image/png
+  #+attr_html: :width 850px
+  #+attr_latex: :width 15cm
+  #+caption: An illustration of what radius is selecting in the network
+  #+name: radius illustration
+  [[file:obipy-resources/radius illustration.png]]
+  :END:
+
+
+\clearpage
+
+  #+BEGIN_SRC ipython :session :ipyfile '((:name "Rectangle_lattice" :filename "obipy-resources/Rectangle_lattice1.png" :caption "A rectangle lattice of cells gives a diffusion profile which shows immunity towards variations in cell-wall sizes" :attr_html ":width 850px" :attr_latex ":width 15cm")) :exports results
+    import seaborn as sns
+    df = pd.read_csv("./Data/rectangle_rectpdsig_local.csv")
+    sns.set(font_scale=2.5)
+
+    for D in df['D'].unique():
+        g=sns.catplot(data=df[(df['R'] < 6) & (df['D'] == D) & (df['PD'] == 0)] , x='time', y='C', col='R', col_wrap=3, kind="point", aspect=2, height=8, sharey=False, hue="sigma")
+        g.set_xticklabels(rotation=30)
+        g.fig.suptitle(f"Diffusion constant: {D}")
+        g.fig.subplots_adjust(top=0.9)
+        break
+
+  #+END_SRC
+
+  #+RESULTS:
+  :RESULTS:
+  # Out [250]:
+  # text/plain
+  : <Figure size 3593.25x1152 with 6 Axes>
+
+  # image/png
+  #+attr_html: :width 850px
+  #+attr_latex: :width 15cm
+  #+caption: A rectangle lattice of cells gives a diffusion profile which shows immunity towards variations in cell-wall sizes
+  #+name: Rectangle_lattice
+  [[file:obipy-resources/Rectangle_lattice1.png]]
+  :END:
+
+
+***** For different values of D
+  #+BEGIN_SRC ipython :session :ipyfile '( (:name "Rectangle_lattice1" :filename "obipy-resources/Rectangle_lattice2.png" :caption "A rectangle lattice of cells gives a diffusion profile which shows immunity towards variations in cell-wall sizes" :attr_html ":width 850px" :attr_latex ":width 15cm") (:name "Rectangle_lattice2" :filename "obipy-resources/Rectangle_lattice3.png" :caption "A rectangle lattice of cells gives a diffusion profile which shows immunity towards variations in cell-wall sizes" :attr_html ":width 850px" :attr_latex ":width 15cm") (:name "Rectangle_lattice3" :filename "obipy-resources/Rectangle_lattice4.png" :caption "A rectangle lattice of cells gives a diffusion profile which shows immunity towards variations in cell-wall sizes" :attr_html ":width 850px" :attr_latex ":width 15cm") ) :exports results
+
+    for idx, D in enumerate(df['D'].unique()):
+        if idx == 0:
+            continue
+        g=sns.catplot(data=df[(df['R'] < 6) & (df['D'] == D) & (df['PD'] == 0)] , x='time', y='C', col='R', col_wrap=3, kind="point", aspect=2, height=8, sharey=False, hue="sigma")
+        g.set_xticklabels(rotation=30)
+        g.fig.suptitle(f"Diffusion constant: {D}")
+        g.fig.subplots_adjust(top=0.9)
+
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [242]:
+# text/plain
+: <Figure size 3600.75x1152 with 6 Axes>
+
+# image/png
+#+attr_html: :width 850px
+#+attr_latex: :width 15cm
+#+caption: A rectangle lattice of cells gives a diffusion profile which shows immunity towards variations in cell-wall sizes
+#+name: Rectangle_lattice1
+[[file:obipy-resources/Rectangle_lattice2.png]]
+
+# text/plain
+: <Figure size 3600.75x1152 with 6 Axes>
+
+# image/png
+#+attr_html: :width 850px
+#+attr_latex: :width 15cm
+#+caption: A rectangle lattice of cells gives a diffusion profile which shows immunity towards variations in cell-wall sizes
+#+name: Rectangle_lattice2
+[[file:obipy-resources/Rectangle_lattice3.png]]
+
+# text/plain
+: <Figure size 3600.75x1152 with 6 Axes>
+
+# image/png
+#+attr_html: :width 850px
+#+attr_latex: :width 15cm
+#+caption: A rectangle lattice of cells gives a diffusion profile which shows immunity towards variations in cell-wall sizes
+#+name: Rectangle_lattice3
+[[file:obipy-resources/Rectangle_lattice4.png]]
+:END:
+
+
+
+
+
+
+** Degree of connections reduce diffusion distance
+1. As the average degree of connections increases, we could assume that diffusion in multiple directions occurs faster.
+2. The increase of degree could also decrease a cell's ability to build a useful store of a signal, and be unable to act upon it. Rendering the given signal useless for defence.
+
+
+*** Degree = 6
+#+BEGIN_SRC ipython :session :ipyfile '((:name "triangle" :filename "obipy-resources/triangle.png" :caption "" :attr_html ":width 850px" :attr_latex ":width 15cm")) :exports results
+    import seaborn as sns
+    df = pd.read_csv("./Data/triangle_trianglepdsig_local.csv")
+    sns.set(font_scale=2.5)
+
+    for D in df['D'].unique():
+        g=sns.catplot(data=df[(df['R'] < 6) & (df['D'] == D) & (df['PD'] == 0)] , x='time', y='C', col='R', col_wrap=3, kind="point", aspect=2, height=8, sharey=False, hue="sigma")
+        g.set_xticklabels(rotation=30)
+        g.fig.suptitle(f"Diffusion constant: {D} - Triangle")
+        g.fig.subplots_adjust(top=0.9)
+        break
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [243]:
+# text/plain
+: <Figure size 3600.75x1152 with 6 Axes>
+
+# image/png
+#+attr_html: :width 850px
+#+attr_latex: :width 15cm
+#+caption:
+#+name: triangle
+[[file:obipy-resources/triangle.png]]
+:END:
+
+
+*** Degree = 3
+#+BEGIN_SRC ipython :session :ipyfile '((:name "Hexagon" :filename "obipy-resources/Hexagon.png" :caption "" :attr_html ":width 850px" :attr_latex ":width 15cm")) :exports results
+    import seaborn as sns
+    df = pd.read_csv("./Data/hexagon_hexagonpdsig_local.csv")
+    sns.set(font_scale=2.5)
+
+    for D in df['D'].unique():
+        g=sns.catplot(data=df[(df['R'] < 6) & (df['D'] == D) & (df['PD'] == 0)] , x='time', y='C', col='R', col_wrap=3, kind="point", aspect=2, height=8, sharey=False, hue="sigma")
+        g.set_xticklabels(rotation=30)
+        g.fig.suptitle(f"Diffusion constant: {D} - Hexagon")
+        g.fig.subplots_adjust(top=0.9)
+        break
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out [244]:
+# text/plain
+: <Figure size 3600.75x1152 with 6 Axes>
+
+# image/png
+#+attr_html: :width 850px
+#+attr_latex: :width 15cm
+#+caption:
+#+name: Hexagon
+[[file:obipy-resources/Hexagon.png]]
+:END:
+
+
+** Variation in number of PD per unit of cell wall increases diffusive potential of small molecules disproportionately to larger molecules
+
+
+** Cell network topology affects a system's ability to self regulate
+1. If a concentration of a given chemical is required in a cell to activate a significant defence/reduction in connectivity, then there exists some threshold for this.
+2. This threshold may be more difficult to reach if cells are highly connected and have a large surface area to which diffuse, and thus reducing the ability to accumulate over time.
+
+** Large cell networks, are not affected by inconsistent ratio's of PD per cell-walls.
+i.e the number of PD would stay (more or less) the same, but they would be randomly distributed irrespective of the amount of cell-wall that a cell has
+
+
+* Integrating narrow-escape solutions 
+** Analytical solution 
+
+#+BEGIN_SRC ipython :session
+  from numpy import pi, log, sqrt
+
+  def schuss_multi_escp(r, D, N, ep):
+      D = (sqrt(D) / r)**2
+      ep  =  ep / r
+      f = lambda ep: ep - ep**2/pi * log(ep) + ep**2/pi * log(2)
+      k = lambda sig: (4*sig) / (pi - 4 * sqrt(sig))
+      sig = (N * ep**2)/4
+      return (f(ep)/(3*D*k(sig))) + 1/(15*D)
+#+END_SRC
+
+** Network integration... 
+
+
+#+BEGIN_SRC ipython :session
+
+  from network_diffusion import CellNetwork as CN
+  import matplotlib.pyplot as plt
+  import networkx as nx
+  import numpy as np
+
+  np.random.seed(5)
+  fig, ax = plt.subplots(1, figsize=(5,5))
+
+  G = CN()
+  G.generate_voronoi(10, bboxsize=2)
+
+  G.set_concentration()
+
+  pos = {}
+  for idx, n in enumerate(G.nodes(data=True)):
+      pos[n[0]] = (n[1]['x'], n[1]['y'])
+  sizes={k: np.around(v['C'],2) for k,v in G.nodes(data=True)}
+  nx.draw(G, pos=pos, ax=ax, node_size=np.array(list(sizes.values()))*2000, with_labels=True)
+  ax.set_aspect('equal', adjustable='box')
+#+END_SRC
+
+#+RESULTS:
+:results:
+# Out [12]: 
+# text/plain
+: <Figure size 360x360 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/4cad12ff07312213558954ac5da21c7f505e8d6a/d2bd6823c336348a2950b16bb1882b434517c264.png]]
+:end:
+
+
+#+BEGIN_SRC ipython :session
+from numpy import pi, log, sqrt
+
+def narrow_escape(r, D, N, ep):
+    D = (sqrt(D) / r)**2
+    ep  =  ep / r
+    f = lambda ep: ep - ep**2/pi * log(ep) + ep**2/pi * log(2)
+    k = lambda sig: (4*sig) / (pi - 4 * sqrt(sig))
+    sig = (N * ep**2)/4
+    return (f(ep)/(3*D*k(sig))) + 1/(15*D)
+
+#+END_SRC
+
+#+RESULTS:
+:results:
+# Out [14]: 
+:end:
+
+
+
+#+BEGIN_SRC ipython :session
+
+  particles = 100
+  D = 300 
+  tt = 100 # seconds for example
+  r = 25  # radius of sphere (i.e. cell) given in um 
+  ep = 10  # Radius of each, given in um 
+
+  # Calculating neighbours is intensive, lets do it once just. 
+  nbrs = {n[0]:[ns for ns in G.neighbors(n[0])] for n in G.nodes(data=True)}
+  weights = G.weights_to_A()
+
+  Cn = np.zeros(G.number_of_nodes())
+
+  for cell in G.nodes(data=True):
+      for p0 in range(int(cell[1]['C']*particles)):
+          cur_pos = cell[0]
+          te = 0
+          while te < tt:
+              N = len(nbrs[cur_pos])
+              # calculate escape time
+              # Assume each PD field is equal ~
+              w = weights[cur_pos][nbrs[cur_pos]]
+              cur_pos = np.random.choice(nbrs[cur_pos], p=w/w.sum())
+
+
+              te += narrow_escape(r, D, N, ep)
+              
+          Cn[cur_pos] += 1    
+
+  fig, ax = plt.subplots(1, figsize=(5,5))
+
+  G.set_concentration(Cn/100)
+  pos = {}
+  for n in G.nodes(data=True):
+      pos[n[0]] = (n[1]['x'], n[1]['y'])
+  sizes={k: np.around(v['C'],2) for k,v in G.nodes(data=True)}
+
+  nx.draw(G, pos=pos, ax=ax, node_size=np.array(list(sizes.values()))*3000, with_labels=True)
+  ax.set_aspect('equal', adjustable='box')
+#+END_SRC
+
+#+RESULTS:
+:results:
+# Out [15]: 
+# text/plain
+: <Figure size 360x360 with 1 Axes>
+
+# image/png
+[[file:obipy-resources/4cad12ff07312213558954ac5da21c7f505e8d6a/14947eaa8263d2a72bf911e134232983c53ff91f.png]]
+:end:
+
+
+#+BEGIN_SRC ipython :session
+  for n in G.nodes(data=True):
+      print(n)
+#+END_SRC
+
+#+RESULTS:
+:results:
+# Out [505]: 
+# output
+(0, {'P': 2.4232802858060323, 'x': 0.8582829084513426, 'y': 0.7706622064800662, 'C': 1.0})
+(1, {'P': 2.9383630441482005, 'x': 1.5499186059742547, 'y': 0.4475859380411014, 'C': 0.0})
+(2, {'P': 2.865924801325097, 'x': 0.287640056022409, 'y': 0.352859943977591, 'C': 0.0})
+(3, {'P': 2.3258036144906766, 'x': 0.9800613160518445, 'y': 0.28704885343968095, 'C': 0.0})
+(4, {'P': 3.273372673201308, 'x': 1.3326502978670713, 'y': 1.5189380312677088, 'C': 0.0})
+(5, {'P': 3.535988039323756, 'x': 1.5928861786288826, 'y': 1.170835603802088, 'C': 0.0})
+(8, {'P': 3.093937061652514, 'x': 0.9838998696593773, 'y': 1.5837916862993582, 'C': 0.0})
+(9, {'P': 2.726477147701871, 'x': 0.24127871783981933, 'y': 1.3392625494604842, 'C': 0.0})
+(6, {'P': 2.657980101781328, 'x': 0.45427768084132075, 'y': 1.8804177054804334, 'C': 0.0})
+(7, {'P': 2.3912406913318645, 'x': 0.5170090537295136, 'y': 1.6850311813752734, 'C': 0.0})
+
+:end:
+

@@ -7,7 +7,7 @@
   import networkx as nx
   import matplotlib.pyplot as plt
   plt.xkcd()
-  kit = pd.read_csv('./Data/kitagawa_estimations.csv')
+  kit = pd.read_csv('../Data/kitagawa_estimations.csv')
   tp0 = kit[kit['H'] == 0].set_index('ABA').drop('H', axis=1)
   tp14 = kit[kit['H'] == 14].set_index('ABA').drop('H', axis=1)
   dt = 1
@@ -34,14 +34,8 @@
 #+END_SRC
 
 #+RESULTS:
-:RESULTS:
-# Out [13]:
-# text/plain
-: <Figure size 432x288 with 1 Axes>
-
-# image/png
-[[file:obipy-resources/5e9e7786ca13002248f281ca1eae232b1e260e62/363e790216cf9d6f3f8ecbfe0f135097e39de36b.png]]
-:END:
+: # Out[17]:
+: [[file:./obipy-resources/ZZfOQo.png]]
 
 
 ** Kitawaga 2018 time course

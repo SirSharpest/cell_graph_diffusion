@@ -1,3 +1,4 @@
+from network_utility import schuss_multi_escp as narrow_escape
 import sys
 from scipy.spatial import distance
 import scipy as sp
@@ -91,6 +92,7 @@ class CellNetwork(nx.classes.graph.Graph):
                     G.add_edge(idx, idy,
                                E=np.around(distance.euclidean(vor.vertices[m[0]],
                                                               vor.vertices[m[1]]), 2))
+        G = nx.relabel_nodes(G, {i: idx for idx, i in enumerate(G.nodes)})
         self.__dict__.update(G.__dict__)
 
     def add_existing_shape(self, G):
@@ -168,7 +170,37 @@ class CellNetwork(nx.classes.graph.Graph):
             I = np.sum(E_hat, axis=1)
             O = np.sum(E_hat, axis=0)
             C = np.diag(np.diag(C) + (I-O))
+            for f, args in zip(rules, rules_args):
+                C = f(C, *args)
             self.update_node_attribute(self.node_attr, np.diag(C))
+
+    def narrow_escape(self, D, time, particles=100):
+        """
+        Something like this:
+
+        1. A number of particles are used in series
+        2. Each particle P, is simulated and moved
+        3. This is done until the total time to observe has been reached
+        4. For each escape time, the particle has a change proportional to
+           the area of the connection to take that path over each other.
+
+
+        Connection  =
+
+        sum(PoresArea) / connectionPoresArea
+        """
+
+        # We assume that C represents a percentage!
+        # Not enforced (yet)!
+        # and that obviously, sum(C) = 1
+
+        A, C = self.extract_graph_info()
+        C *= particles
+
+        N = 0  # Number of neighbours (actually pores, but w/e)
+        ep = 0  # Radius of each
+        r = 50  # radius of sphere i.e. cell
+        mfpt = narrow_escape(r, D, N, ep)
 
     def extract_graph_info(self):
         A = nx.to_numpy_array(self)
