@@ -2,8 +2,11 @@ import numpy as np
 from .networking_nx import extract_graph_info, update_node_attribute, weights_to_A, DEFAULT_ATTR
 from .networking_utility import enforce_matrix_shape, check_negative_values
 
-
 def diffuse(G, D, dt, epochs, rules=[], rules_args=[]):
+    # TODO: Fix this diffusion mess
+
+    return False
+
     A, C = extract_graph_info(G)
     E = (enforce_matrix_shape(
         weights_to_A(G), A))
