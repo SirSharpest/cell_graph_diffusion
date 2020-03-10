@@ -10,12 +10,12 @@ def multi_escp(r, D, N, ep):
     return (f(ep)/(3*D*k(sig))) + 1/(15*D)
 
 
-def check_negative_values(G, A):
+def check_negative_values(A):
     if np.any(A < 0):
         raise ValueError(f"Matrix cannot contain negative values! {A}")
 
 
-def enforce_matrix_shape(G, I, O):
+def enforce_matrix_shape(I, O):
     if type(I) != np.ndarray or I.shape != O.shape:
         I = (I*O)
     return I

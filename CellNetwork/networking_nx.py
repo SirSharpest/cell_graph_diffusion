@@ -1,6 +1,7 @@
 import sys
 from scipy.spatial import distance
 import scipy as sp
+import scipy.stats as stats
 import numpy as np
 import networkx as nx
 from networkx.generators.lattice import grid_2d_graph
@@ -39,9 +40,19 @@ def set_edge_attribute(G, attr, new_attrs):
 
 
 def set_random_edge_weights(G, mu, sigma):
-    E = np.random.normal(mu, sigma, G.number_of_edges())
-    E[E < 0] = 1
-    E = np.around(E, 2)
+    lower, upper = 0, 1
+    if sigma == 0:
+        E = np.ones(G.number_of_edges()) + mu
+    else:
+        X = stats.truncnorm(
+            (lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma)
+        E = X.rvs(G.number_of_edges())
+        E = np.around(E, 2)
+    set_edge_attribute(G, DEFAULT_ATTR, E)
+
+
+def set_default_edge_weights(G):
+    E = np.ones(G.number_of_edges())
     set_edge_attribute(G, DEFAULT_ATTR, E)
 
 
@@ -64,6 +75,8 @@ def generate_shape(shape, n=1, m=1):
     G = f(m, n)
     set_edge_attribute(G, DEFAULT_ATTR, np.ones(G.number_of_edges()))
     set_concentration(G)
+    set_shape_xy(G)
+    set_default_edge_weights(G)
     return G
 
 
@@ -80,21 +93,15 @@ def get_concentration(G, names=False):
     return list(nx.get_node_attributes(G, DEFAULT_C).values())
 
 
-def weights_to_A(G, attr=None):
-    if attr is None:
-        attr = DEFAULT_ATTR
+def set_shape_xy(G):
+    for i, XY in enumerate(['x', 'y']):
+        nx.set_node_attributes(G, {n: n[i]
+                                   for (n, d) in G.nodes(data=True)}, XY)
+
+
+def weights_to_A(G):
     A = nx.to_numpy_array(G)
-    W1 = np.triu(A)
-    W2 = np.tril(A)
-    W = np.zeros(A.shape)
-    try:
-        for w in (W1, W2):
-            list_of_coords = np.where(w == 1)
-            w[list_of_coords] = get_weights(G, attr=attr)
-            W += w
-    except ValueError:
-        print('Incorrect setup')
-        return 0
+    W = np.triu(A) + np.tril(A)
     return W
 
 

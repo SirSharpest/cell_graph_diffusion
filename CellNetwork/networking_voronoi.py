@@ -4,19 +4,16 @@ import sys
 from scipy.spatial import distance, Voronoi
 
 
-def generate_voronoi(G, ncells, bboxsize=1):
+def generate_voronoi(ncells, bboxsize=1):
     def centeroidnp(arr):
         length, dim = arr.shape
         return np.array([np.sum(arr[:, i])/length for i in range(dim)])
     cells = np.around(np.random.rand(ncells, 2), 2)*bboxsize
     cells[cells < 0.01] = cells[cells < 0.01] + 0.01
     cells[cells > bboxsize-0.01] = cells[cells > bboxsize-0.01] - 0.01
-
     bounding_box = np.array([0., bboxsize, 0., bboxsize])
-    vor = G.voronoi(cells, bounding_box)
-
+    vor = voronoi(cells, bounding_box)
     G = nx.Graph()
-
     for idx, region in enumerate(vor.filtered_regions):
         G.add_node(idx)
         vertices = vor.vertices[region + [region[0]], :]
@@ -24,9 +21,7 @@ def generate_voronoi(G, ncells, bboxsize=1):
         for idxy in range(len(vertices)-1):
             P += distance.euclidean(vertices[idxy], vertices[idxy+1])
         G.nodes[idx]['P'] = P
-
         G.nodes[idx]['x'], G.nodes[idx]['y'] = centeroidnp(vertices)
-
         for idy, r in enumerate(vor.filtered_regions):
             if idy == idx:
                 continue
@@ -36,7 +31,7 @@ def generate_voronoi(G, ncells, bboxsize=1):
                            E=np.around(distance.euclidean(vor.vertices[m[0]],
                                                           vor.vertices[m[1]]), 2))
     G = nx.relabel_nodes(G, {i: idx for idx, i in enumerate(G.nodes)})
-    G.__dict__.update(G.__dict__)
+    return G
 
 
 
