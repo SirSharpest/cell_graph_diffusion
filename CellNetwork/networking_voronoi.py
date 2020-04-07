@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 import sys 
 from scipy.spatial import distance, Voronoi
-
+from .networking_nx import set_default_edge_weights, set_concentration
 
 def generate_voronoi(ncells, bboxsize=1):
     def centeroidnp(arr):
@@ -31,8 +31,10 @@ def generate_voronoi(ncells, bboxsize=1):
                            E=np.around(distance.euclidean(vor.vertices[m[0]],
                                                           vor.vertices[m[1]]), 2))
     G = nx.relabel_nodes(G, {i: idx for idx, i in enumerate(G.nodes)})
-    return G
+    set_concentration(G)
+    set_default_edge_weights(G)
 
+    return G
 
 
 

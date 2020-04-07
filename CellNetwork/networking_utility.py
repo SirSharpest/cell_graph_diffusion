@@ -7,7 +7,10 @@ def multi_escp(r, D, N, ep):
     f = lambda ep: ep - ep**2/pi * log(ep) + ep**2/pi * log(2)
     k = lambda sig: (4*sig) / (pi - 4 * sqrt(sig))
     sig = (N * ep**2)/4
-    return (f(ep)/(3*D*k(sig))) + 1/(15*D)
+    t = (f(ep)/(3*D*k(sig))) + 1/(15*D)
+    if t < 0:
+        raise ValueError('Check parameters - escape time cannot be negative')
+    return t
 
 
 def check_negative_values(A):

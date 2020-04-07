@@ -6,9 +6,7 @@ def diffuse(G, D, dt, epochs, q=1, rules=[], rules_args=[]):
     A, C = extract_graph_info(G)
     E = (enforce_matrix_shape(
         weights_to_A(G), A))
-    PD = (enforce_matrix_shape(
-        weights_to_A(G), A)) * E * q
-    q_hat = PD * D * dt
+    q_hat = E * q * D * dt
     for i in range(epochs):
         check_negative_values(C)
         E_hat = np.diag(C) * q_hat

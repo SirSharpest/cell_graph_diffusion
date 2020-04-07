@@ -77,6 +77,7 @@ def generate_shape(shape, n=1, m=1):
     set_concentration(G)
     set_shape_xy(G)
     set_default_edge_weights(G)
+    G = nx.convert_node_labels_to_integers(G)
     return G
 
 
