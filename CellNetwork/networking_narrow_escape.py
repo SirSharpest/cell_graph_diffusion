@@ -5,7 +5,7 @@ import multiprocessing
 from os import cpu_count
 
 
-def move_particles(G, particles, nbrs, Rn, Eps, D, weights, tt, pc_stay, lim_moves=1000):
+def move_particles(G, particles, nbrs, Rn, Eps, D, weights, tt, pc_stay, sigma, lim_moves=1000, ignore_error=True):
     np.random.seed()
     Cn = np.zeros(G.number_of_nodes())
     for cell in G.nodes(data=True):
@@ -13,17 +13,21 @@ def move_particles(G, particles, nbrs, Rn, Eps, D, weights, tt, pc_stay, lim_mov
             cur_pos = cell[0]
             te = 0
             moves = 0
-
             while te < tt:
                 N = len(nbrs[cur_pos])
                 # calculate escape time
                 # Assume each PD field is equal ~
                 w = weights[cur_pos][nbrs[cur_pos]]
-                te += multi_escp(Rn[cur_pos], D, N, Eps[cur_pos])
+                u_t = abs(multi_escp(Rn[cur_pos], D, N,
+                                     Eps[cur_pos], ignore_error=ignore_error))
+                st = abs(np.random.normal(u_t, sigma*u_t))
+                te += st
                 if te > tt:
                     break
                 odds = [n for n in nbrs[cur_pos]]
                 odds.append(cur_pos)
+                if w.sum() == 0:
+                    break
                 w = [wi for wi in (w/w.sum())]
                 w = [wi - pc_stay/len(w) for wi in w]
                 w.append(pc_stay)
@@ -38,13 +42,18 @@ def move_particles(G, particles, nbrs, Rn, Eps, D, weights, tt, pc_stay, lim_mov
     return Cn
 
 
-def escape_through_network(G, D, tt, Rn, Eps, particles=1000, pc_stay=0.5, processes=1):
+def escape_through_network(G, D, tt, Rn, Eps, particles=1000, pc_stay=0.5, sigma=0,  processes=1, deadcells=False):
     # Rn = array of sizes
     # Eps = array of PD radius
     # Calculating neighbours is intensive, lets do it once just.
     nbrs = {n[0]: [ns for ns in G.neighbors(n[0])] for n in G.nodes(data=True)}
     weights = weights_to_A(G)
-    rep_args = [[G, int(particles//processes), nbrs, Rn, Eps, D, weights, tt, pc_stay]
+    if deadcells:
+        for cell in G.nodes(data=True):
+            if 'deadcell' in cell[1]:
+                if cell[1]['deadcell']:
+                    weights[cell[0]] = 0
+    rep_args = [[G, int(particles//processes), nbrs, Rn, Eps, D, weights, tt, pc_stay, sigma]
                 for _ in range(processes)]
     with multiprocessing.Pool(processes=processes) as pool:
         results = pool.starmap(move_particles, rep_args)
