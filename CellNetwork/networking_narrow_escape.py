@@ -1,4 +1,3 @@
-from .networking_utility import multi_escp
 from .networking_nx import weights_to_A, update_node_attribute, DEFAULT_C
 import numpy as np
 import multiprocessing
