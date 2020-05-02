@@ -17,6 +17,7 @@ class LatticeNetworkModel:
                            for n in self.G.nodes()])
 
         self.IC = IC
+        self.reset_IC()
 
     def reset_IC(self):
         if self.IC is 'default':
