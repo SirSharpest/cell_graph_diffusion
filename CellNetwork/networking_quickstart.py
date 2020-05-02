@@ -11,13 +11,18 @@ class LatticeNetworkModel:
     def __init__(self, shape, sizeN, sizeM, IC='default'):
         self.G = generate_shape(shape, n=int(np.sqrt(sizeN)),
                                 m=int(np.sqrt(sizeM)))
-        set_default_edge_weights(G)
+        self.shape = shape
+        set_default_edge_weights(self.G)
         self.N = np.array([len([_ for _ in self.G.neighbors(n)])
                            for n in self.G.nodes()])
-        if IC is 'default':
+
+        self.IC = IC
+
+    def reset_IC(self):
+        if self.IC is 'default':
             set_concentration(self.G)
         else:
-            set_concentration(self.G, IC)
+            set_concentration(self.G, self.IC)
         self.totalTime = 0
 
     def set_model_parameters(self, D, avgCellR=50, PDR=5e-3, PDN=1e3,
@@ -55,7 +60,7 @@ class LatticeNetworkModel:
         self.apply_radius_G()
         self.Rn = np.array([v['r'] for k, v in self.G.nodes(data=True)])
         self.PD_per_cell = np.around(self.PD_per_um2 * (4*np.pi*(self.Rn**2)))
-        self.Ep = self.PD_per_cell * self.PDA
+        self.Ep = self.PD_per_cell * self.PDArea
         self.Eps = self.Ep/self.PD_per_cell
         self.set_effective_diffusion()
 
