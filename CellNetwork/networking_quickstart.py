@@ -1,10 +1,10 @@
 import numpy as np
-from .CellNetwork.networking_nx import set_concentration
-from .CellNetwork.networking_nx import set_default_edge_weights
-from .CellNetwork.networking_nx import generate_shape
-from .CellNetwork.networking_nx import get_centre_node
-from .CellNetwork.networking_diffuse import calc_D_eff, diffuse
-from .CellNetwork.networking_utility import G_to_pd
+from .networking_nx import set_concentration
+from .networking_nx import set_default_edge_weights
+from .networking_nx import generate_shape
+from .networking_nx import get_centre_node
+from .networking_diffuse import calc_D_eff, diffuse
+from .networking_utility import G_to_pd
 
 
 class LatticeNetworkModel:
